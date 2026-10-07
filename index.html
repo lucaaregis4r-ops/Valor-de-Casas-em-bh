@@ -1,177 +1,47 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Moradia BH — Inteligência do mercado imobiliário</title>
-  <meta name="description" content="Dados e tendências do mercado imobiliário de Belo Horizonte e região.">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="assets/css/app.css">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Moradia BH — Observatório do morar</title>
+  <meta name="description" content="Atlas histórico e acompanhamento dos anúncios residenciais de Belo Horizonte.">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="stylesheet" href="assets/css/app.css">
 </head>
 <body>
-  <main class="app">
-    <aside class="sidebar">
-      <header class="sidebar-hero">
-        <div class="brand-lockup">
-          <div class="brand-mark" aria-hidden="true">BH</div>
-          <div>
-            <span class="eyebrow">Inteligência imobiliária</span>
-            <h1>Moradia BH</h1>
-          </div>
-        </div>
-        <p>Dados, preços e movimento do mercado residencial de Belo Horizonte e região.</p>
-        <div id="collectionStatus" class="status-banner" data-state="loading" aria-live="polite">
-          <span class="status-dot" aria-hidden="true"></span>
-          <span><strong>Verificando atualização</strong><small>Carregando o estado da coleta diária.</small></span>
-        </div>
-      </header>
-
-      <div class="sidebar-content">
-        <section class="control-card">
-          <div class="section-heading"><span>Visão do mercado</span><small>01</small></div>
-          <div class="family-tabs" role="tablist" aria-label="Período do observatório">
-            <button id="familyHistorical" class="active" role="tab" aria-selected="true">Histórico</button>
-            <button id="familyDaily" role="tab" aria-selected="false">Mercado diário</button>
-          </div>
-          <div id="historicalControls">
-            <label>Período ou camada</label>
-            <div class="buttons">
-              <button id="mode2021">2021</button>
-              <button id="mode2026">2026</button>
-              <button id="modeDelta" class="active">Variação</button>
-              <button id="modeRent">Aluguel</button>
-            </div>
-            <label for="rentMetric">Métrica do aluguel</label>
-            <select id="rentMetric">
-              <option value="rent_total">Aluguel médio</option>
-              <option value="rent_m2">Aluguel médio/m²</option>
-              <option value="condo">Condomínio médio</option>
-              <option value="condo_index">Índice de condominização</option>
-            </select>
-          </div>
-
-          <div id="dailyControls" hidden>
-            <div class="grid">
-              <div>
-                <label for="dailyDate">Data do mercado</label>
-                <input id="dailyDate" type="date">
-              </div>
-              <div>
-                <label for="dailyCompareDate">Comparar com</label>
-                <input id="dailyCompareDate" type="date" aria-describedby="compareHelp">
-              </div>
-            </div>
-            <div class="date-labels"><span id="dailyDateStart"></span><span id="dailyDateEnd"></span></div>
-            <p id="compareHelp" class="note">A segunda data é opcional e ativa a comparação entre períodos.</p>
-            <label for="dailyMetric">Métrica</label>
-            <select id="dailyMetric">
-              <option value="median_price_m2">Mediana do aluguel/m²</option>
-              <option value="active">Oferta ativa</option>
-              <option value="new">Novos anúncios</option>
-              <option value="removed">Retirados</option>
-              <option value="price_reduced">Reduções de preço</option>
-              <option value="price_increased">Aumentos de preço</option>
-              <option value="variation_7d">Variação em 7 dias</option>
-              <option value="variation_30d">Variação em 30 dias</option>
-            </select>
-          </div>
-        </section>
-
-        <section class="control-card">
-          <div class="section-heading"><span>Recorte geográfico</span><small>02</small></div>
-          <div class="grid">
-            <div id="typeFilterWrap">
-              <label for="typeFilter">Tipo</label>
-              <select id="typeFilter">
-                <option value="apartment">Apartamentos</option>
-                <option value="all">Todos</option>
-                <option value="house">Casas</option>
-              </select>
-            </div>
-            <div>
-              <label for="cityFilter">Cidade</label>
-              <select id="cityFilter"></select>
-            </div>
-          </div>
-          <label for="neighborhoodFilter">Bairro</label>
-          <select id="neighborhoodFilter"></select>
-        </section>
-
-        <section class="control-card" id="historicalControlsDetails">
-          <div class="section-heading"><span>Visualização</span><small>03</small></div>
-          <div class="grid">
-            <div>
-              <label for="minSamples">Amostra mínima</label>
-              <select id="minSamples">
-                <option value="5">5 por ano</option>
-                <option value="10">10 por ano</option>
-                <option value="20">20 por ano</option>
-              </select>
-            </div>
-            <div>
-              <label for="radius">Raio do calor</label>
-              <input id="radius" type="range" min="14" max="38" value="24">
-            </div>
-          </div>
-          <label for="deltaStyle">Visual da variação</label>
-          <select id="deltaStyle">
-            <option value="bubbles">Bolhas por bairro</option>
-            <option value="heat">Mapa de calor</option>
-            <option value="both">Bolhas + calor</option>
-            <option value="quadrants">Quadrantes de valorização</option>
-          </select>
-          <div class="grid">
-            <div>
-              <label for="cellSize">Quadrantes</label>
-              <select id="cellSize">
-                <option value="300">300 m</option>
-                <option value="500" selected>500 m</option>
-                <option value="1000">1 km</option>
-                <option value="2000">2 km</option>
-              </select>
-            </div>
-            <div>
-              <label for="priceStyle">Visual do preço</label>
-              <select id="priceStyle">
-                <option value="bubbles">Bolhas</option>
-                <option value="heat">Calor</option>
-                <option value="both">Bolhas + calor</option>
-                <option value="points_abs">Pontos: preço/m²</option>
-                <option value="points_relative">Pontos: relativo</option>
-                <option value="grid_price">Grade: preço/m²</option>
-                <option value="grid_relative">Grade: relativo</option>
-              </select>
-            </div>
-          </div>
-        </section>
-
-        <section class="insights-section">
-          <div class="section-heading"><span>Panorama</span><small>Dados filtrados</small></div>
-          <div class="stats" id="stats"></div>
-          <div class="stats" id="compareSummary" hidden></div>
-          <div class="stats" id="neighborhoodSummary"></div>
-          <p class="note data-note" id="note"></p>
-        </section>
-
-        <section class="ranking-section">
-          <div class="section-heading"><span id="rankingLabel">Maiores variações</span><small>Ranking</small></div>
-          <ul class="list" id="ranking"></ul>
-        </section>
+  <header class="site-header">
+    <a class="brand" href="#/map" aria-label="Moradia BH, ir para o mapa"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span><strong>MORADIA <em>BH</em></strong><small>Observatório residencial</small></span></a>
+    <nav class="primary-nav" aria-label="Navegação principal">
+      <a href="#/map" data-nav="map">Mapa</a><a href="#/atlas" data-nav="atlas">Atlas</a><a href="#/agora" data-nav="agora">Mercado Agora</a><a href="#/bairros" data-nav="bairros">Bairros</a><a href="#/metodologia" data-nav="metodologia">Metodologia</a>
+    </nav>
+  </header>
+  <main>
+    <section id="exploreView" class="explore-view">
+      <div class="page-heading"><div><p class="overline" id="viewKicker">CARTOGRAFIA DO MORAR · BELO HORIZONTE</p><h1 id="viewTitle">O custo de morar, no mapa.</h1><p class="lead" id="viewIntro">Explore a transformação histórica do mercado residencial e acompanhe as ofertas coletadas recentemente.</p></div><div id="collectionStatus" class="status-banner" data-state="loading" aria-live="polite"><span class="status-dot" aria-hidden="true"></span><span><strong>Verificando atualização</strong><small>Carregando a coleta.</small></span></div></div>
+      <div id="homeChoices" class="home-choices"><a href="#/atlas"><span>01 / HISTÓRICO</span><strong>Atlas <b aria-hidden="true">↗</b></strong><small>Comparar 2021 e 2026</small></a><a href="#/agora"><span>02 / COLETAS</span><strong>Mercado Agora <b aria-hidden="true">↗</b></strong><small>Acompanhar anúncios recentes</small></a></div>
+      <div class="map-controls">
+        <div class="control-main"><span class="control-caption">NO MAPA</span><div id="historicalControls" class="historical-picks"><button id="mode2021" type="button">2021</button><button id="mode2026" type="button">2026</button><button id="modeDelta" type="button" class="active">Variação 21–26</button><button id="modeRent" type="button">Aluguel 2026</button></div><div id="dailyControls" class="daily-picks" hidden><label for="dailyMetric">Observar</label><select id="dailyMetric"><option value="median_price_m2">Mediana aluguel/m²</option><option value="active">Oferta ativa</option><option value="new">Novos anúncios</option><option value="removed">Retirados</option><option value="price_reduced">Reduções de preço</option><option value="price_increased">Aumentos de preço</option><option value="variation_7d">Variação em 7 dias</option><option value="variation_30d">Variação em 30 dias</option></select><div id="dailyDateWrap"><label for="dailyDate">Data</label><input id="dailyDate" type="date"><span class="date-labels"><span id="dailyDateStart"></span><span id="dailyDateEnd"></span></span></div></div></div>
+        <button id="configToggle" class="text-button" type="button" aria-controls="configPanel" aria-expanded="false">Configurar mapa <span aria-hidden="true">⌄</span></button>
       </div>
-    </aside>
-    <section class="map-shell" aria-label="Mapa do mercado imobiliário">
-      <div class="map-toolbar">
-        <span class="map-toolbar-icon" aria-hidden="true"></span>
-        <span><small>Área analisada</small><strong>Belo Horizonte + RMBH</strong></span>
+      <div id="configPanel" class="config-panel" hidden>
+        <div class="area-picks"><label for="cityFilter">Cidade</label><select id="cityFilter"></select><label for="neighborhoodFilter">Bairro</label><select id="neighborhoodFilter"></select></div>
+        <div class="config-grid">
+          <div id="typeFilterWrap"><label for="typeFilter">Tipo de imóvel · Atlas</label><select id="typeFilter"><option value="apartment">Apartamentos</option><option value="all">Todos</option><option value="house">Casas</option></select></div>
+          <div id="rentMetricWrap"><label for="rentMetric">Métrica do aluguel · base 2026</label><select id="rentMetric"><option value="rent_total">Aluguel médio</option><option value="rent_m2">Aluguel médio/m²</option><option value="condo">Condomínio médio</option><option value="condo_index">Índice de condominização</option></select></div>
+          <div id="dailyCompareWrap"><label for="dailyCompareDate">Comparar com</label><input id="dailyCompareDate" type="date"><small id="compareHelp">Opcional; compara períodos de coleta.</small></div>
+          <div id="historicalControlsDetails" class="config-grid nested"><div><label for="minSamples">Amostra mínima por ano</label><select id="minSamples"><option value="5">5</option><option value="10">10</option><option value="20">20</option></select></div><div><label for="radius">Raio do calor</label><input id="radius" type="range" min="14" max="38" value="24"></div><div><label for="deltaStyle">Visual da variação</label><select id="deltaStyle"><option value="bubbles">Bolhas por bairro</option><option value="heat">Mapa de calor</option><option value="both">Bolhas + calor</option><option value="quadrants">Quadrantes de valorização</option></select></div><div><label for="cellSize">Tamanho dos quadrantes</label><select id="cellSize"><option value="300">300 m</option><option value="500" selected>500 m</option><option value="1000">1 km</option><option value="2000">2 km</option></select></div><div><label for="priceStyle">Visual do preço</label><select id="priceStyle"><option value="bubbles">Bolhas</option><option value="heat">Calor</option><option value="both">Bolhas + calor</option><option value="points_abs">Pontos: preço/m²</option><option value="points_relative">Pontos: relativo</option><option value="grid_price">Grade: preço/m²</option><option value="grid_relative">Grade: relativo</option></select></div></div>
+        </div>
       </div>
-      <div id="map"></div>
+      <div class="map-frame"><div class="map-stamp"><span id="mapSourceLabel">ATLAS · BASES 2021 E 2026</span><strong>Belo Horizonte e região metropolitana</strong></div><div id="map" role="region" aria-label="Mapa do mercado residencial"></div></div>
+      <div class="map-footnote"><span id="mapCaption">Dados históricos consolidados. Valores de anúncio não equivalem a preço de transação.</span><span>Arraste para explorar · clique nos pontos para detalhes</span></div>
+      <div id="analysisSection" class="analysis-layout"><div><div class="section-heading"><span id="analysisEyebrow">LEITURA DO TERRITÓRIO</span><h2 id="analysisTitle">Panorama da área selecionada</h2></div><div class="stats" id="stats"></div><div class="stats" id="compareSummary" hidden></div><div class="stats" id="neighborhoodSummary"></div><p class="data-note" id="note" aria-live="polite"></p></div><div class="ranking-section"><div class="section-heading"><span>BAIRROS EM FOCO</span><h2 id="rankingLabel">Onde mais valorizou</h2></div><ol class="list" id="ranking"></ol><div id="rankingDeclines" hidden><h3>Onde houve queda</h3><ol class="list" id="declineList"></ol></div></div></div>
+      <section id="comparisonSection" class="comparison-section"><div class="section-heading"><span>ATLAS · LEITURA COMPARADA</span><h2>Coloque bairros lado a lado</h2><p>Compare as medianas do preço pedido de venda por m².</p></div><label for="compareNeighborhoods">Bairros para comparação</label><select id="compareNeighborhoods" multiple size="6" aria-describedby="compareInstruction"></select><p id="compareInstruction" class="hint">Use Ctrl ou ⌘ para escolher dois ou mais bairros.</p><div id="comparisonResults" class="comparison-results"></div></section>
     </section>
+    <section id="bairrosView" class="content-view" hidden><p class="overline">ÍNDICE TERRITORIAL</p><h1>Bairros de BH</h1><p class="lead">Consulte, em blocos separados, a base histórica de venda e os anúncios recentes de aluguel.</p><label for="bairroSearch">Buscar bairro</label><input id="bairroSearch" type="search" placeholder="Digite o nome do bairro"><div id="bairroDirectory" class="bairro-directory"></div></section>
+    <section id="profileView" class="content-view" hidden><a href="#/bairros" class="back-link">← Todos os bairros</a><p class="overline">PERFIL DE BAIRRO</p><h1 id="profileTitle">Bairro</h1><p class="lead" id="profileSubtitle"></p><div id="profileHistorical" class="profile-block"></div><div id="profileCurrent" class="profile-block"></div></section>
+    <section id="methodView" class="content-view methodology" hidden><p class="overline">COMO LER O OBSERVATÓRIO</p><h1>Metodologia</h1><p class="lead">Duas bases, duas perguntas. Cada ambiente informa sua fonte e seu período.</p><div class="method-grid"><section><span>01 / ATLAS</span><h2>Transformação histórica</h2><p>O Atlas usa as bases de anúncios de venda de 2021 e 2026 em <code>data/baseline</code>. A variação compara a mediana do preço pedido por m² de bairros com amostra mínima em ambos os anos. A base de 2021 foi tratada como apartamentos, pois não possui tipo de imóvel. O recorte de aluguel 2026 é da base histórica 2026 e tem métricas próprias.</p></section><section><span>02 / MERCADO AGORA</span><h2>Oferta observada</h2><p>O Mercado Agora usa <code>data/public</code>: anúncios ativos de aluguel, eventos e agregados por bairro e data. A comparação entre dias descreve a oferta observada nas coletas; mudanças de composição podem alterar a mediana. Locais dos anúncios podem ser aproximados pelo bairro. Métricas de variação aparecem apenas quando calculadas pela base.</p></section></div><p class="method-caveat">Preços são pedidos em anúncios, não valores de transação. Amostras pequenas não sustentam conclusões sobre tendência do bairro. A mediana histórica de venda e as coletas recentes de aluguel usam fontes e métodos distintos.</p></section>
   </main>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-  <script type="module" src="assets/js/app.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script><script type="module" src="assets/js/app.js"></script>
 </body>
 </html>
