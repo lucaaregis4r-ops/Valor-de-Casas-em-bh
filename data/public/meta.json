@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "generated_at": null,
+  "last_successful_update": null,
+  "active_listings": 0,
+  "sources_ok": 0,
+  "sources_failed": 0,
+  "sources_running": 0,
+  "sources_degraded": 0,
+  "health": {
+    "status": "no_data",
+    "sources": {
+      "healthy": 0,
+      "degraded": 0,
+      "failed": 0,
+      "running": 0
+    }
+  },
+  "sources": [],
+  "variation_definition": "Variação da mediana dos anúncios observados; a composição da oferta pode mudar."
+}
