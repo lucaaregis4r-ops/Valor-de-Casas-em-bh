@@ -680,6 +680,31 @@ function localDateLabel(value) {
   const date = new Date(`${value.slice(0, 10)}T12:00:00`);
   return Number.isNaN(date.valueOf()) ? escapeHtml(value) : date.toLocaleDateString('pt-BR');
 }
+function renderCollectionStatus() {
+  const banner = document.getElementById('collectionStatus');
+  const health = publicMeta?.health?.status || 'unknown';
+  const lastSuccess = publicMeta?.last_successful_update
+    ? new Date(publicMeta.last_successful_update).toLocaleString('pt-BR')
+    : null;
+  const failedSource = publicMeta?.sources?.find(source => source.status === 'failed');
+  const presentations = {
+    healthy: ['success', 'Dados atualizados', lastSuccess ? `Última coleta válida em ${lastSuccess}.` : 'A coleta diária está saudável.'],
+    success: ['success', 'Dados atualizados', lastSuccess ? `Última coleta válida em ${lastSuccess}.` : 'A coleta diária está saudável.'],
+    degraded: ['degraded', 'Atualização parcial', 'A base válida foi preservada enquanto uma fonte requer atenção.'],
+    running: ['running', 'Coleta em andamento', 'Os novos dados serão publicados depois da validação.'],
+    failed: [
+      'failed',
+      lastSuccess ? 'Última coleta não concluída' : 'Primeira coleta não concluída',
+      failedSource?.failure_type
+        ? `A base publicada foi preservada. Falha: ${failedSource.failure_type}.`
+        : 'A base publicada foi preservada e a fonte requer atenção.'
+    ],
+    unknown: ['degraded', 'Aguardando dados diários', 'O histórico de 2021 e 2026 continua disponível.']
+  };
+  const [state, title, detail] = presentations[health] || presentations.unknown;
+  banner.dataset.state = state;
+  banner.innerHTML = `<span class="status-dot" aria-hidden="true"></span><span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(detail)}</small></span>`;
+}
 function listingHistorySvg(history) {
   const points = (history || []).filter(item => Number.isFinite(item.price));
   if (points.length < 2) return '';
@@ -916,9 +941,12 @@ function drawDaily() {
   dailySummary(rows, selectedDate, metric);
   const lastSuccess = publicMeta?.last_successful_update
     ? new Date(publicMeta.last_successful_update).toLocaleString('pt-BR') : 'sem coleta válida';
+  const collectionFailed = publicMeta?.health?.status === 'failed';
   document.getElementById('note').textContent = rows.length
     ? `${localDateLabel(selectedDate)} · ${plotted} elementos no mapa. Bolhas históricas representam médias de localização por bairro; anúncios individuais aparecem no dia mais recente. Última coleta válida: ${lastSuccess}.`
-    : `Sem dados diários para ${localDateLabel(selectedDate)} com os filtros atuais.`;
+    : collectionFailed
+      ? 'A coleta diária não produziu uma base válida. O histórico de 2021 e 2026 continua disponível enquanto a fonte é corrigida.'
+      : `Sem dados diários para ${localDateLabel(selectedDate)} com os filtros atuais.`;
 }
 function redraw() {
   const historical = viewFamily === 'historical';
@@ -991,6 +1019,7 @@ async function initializeApp() {
   allCities = [...new Set(allPoints.map(point => point.city).filter(Boolean))];
   allNeighborhoods = [...new Set(allPoints.map(point => point.neighborhood).filter(Boolean))];
 
+  renderCollectionStatus();
   fillSelects();
   const dates = [...new Set(neighborhoodDaily.map(row => row.date).filter(Boolean))].sort();
   const dateInput = document.getElementById('dailyDate');
