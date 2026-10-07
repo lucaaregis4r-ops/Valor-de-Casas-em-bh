@@ -20,6 +20,7 @@ class CollectionValidationPolicy:
     min_monthly_rent: Decimal = Decimal("100")
     max_monthly_rent: Decimal = Decimal("100000")
     max_duration_seconds: float = 7200.0
+    allow_truncated_initial: bool = False
 
     def __post_init__(self) -> None:
         if self.min_records < 0:
@@ -47,7 +48,8 @@ def validate_prepared_collection(
 ) -> None:
     """Reject incomplete or implausible snapshots before any listing is written."""
     count = len(prepared.snapshots)
-    if prepared.metrics.get("truncated"):
+    truncated_initial_allowed = policy.allow_truncated_initial and previous_success_count is None
+    if prepared.metrics.get("truncated") and not truncated_initial_allowed:
         candidates = prepared.metrics.get("candidate_pages", "?")
         attempted = prepared.metrics.get("pages_attempted", "?")
         raise CollectionValidationError(

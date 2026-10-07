@@ -27,6 +27,11 @@ def main() -> None:
     parser.add_argument("--max-monthly-rent", type=Decimal, default=Decimal("100000"))
     parser.add_argument("--max-duration-seconds", type=float, default=7200)
     parser.add_argument(
+        "--allow-truncated-initial",
+        action="store_true",
+        help="Aceita uma amostra parcial somente quando ainda não existe coleta válida.",
+    )
+    parser.add_argument(
         "--geocoding-cache",
         type=Path,
         default=Path(os.environ.get("GEOCODING_CACHE_PATH", "data/geocoding_cache.json")),
@@ -56,6 +61,7 @@ def main() -> None:
                 min_monthly_rent=args.min_monthly_rent,
                 max_monthly_rent=args.max_monthly_rent,
                 max_duration_seconds=args.max_duration_seconds,
+                allow_truncated_initial=args.allow_truncated_initial,
             ),
         )
         cache_entries_updated = geocoding_cache.update_from(collector.source_coordinate_rows)

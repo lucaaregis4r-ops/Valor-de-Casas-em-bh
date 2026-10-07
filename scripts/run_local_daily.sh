@@ -45,7 +45,7 @@ collect_status=0
   --min-records "${PIPELINE_MIN_RECORDS:-50}" \
   --max-drop-percent "${PIPELINE_MAX_DROP_PERCENT:-70}" \
   --max-invalid-fraction "${PIPELINE_MAX_INVALID_FRACTION:-0.05}" \
-  --max-page-failure-fraction "${PIPELINE_MAX_PAGE_FAILURE_FRACTION:-0}" \
+  --max-page-failure-fraction "${PIPELINE_MAX_PAGE_FAILURE_FRACTION:-0.02}" \
   --min-parse-success-fraction "${PIPELINE_MIN_PARSE_SUCCESS_FRACTION:-0.8}" \
   --min-monthly-rent "${PIPELINE_MIN_MONTHLY_RENT:-100}" \
   --max-monthly-rent "${PIPELINE_MAX_MONTHLY_RENT:-100000}" \
