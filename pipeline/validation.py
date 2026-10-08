@@ -19,7 +19,7 @@ class CollectionValidationPolicy:
     min_parse_success_fraction: float = 0.8
     min_monthly_rent: Decimal = Decimal("100")
     max_monthly_rent: Decimal = Decimal("100000")
-    max_duration_seconds: float = 7200.0
+    max_duration_seconds: float = 14400.0
     allow_truncated_initial: bool = False
 
     def __post_init__(self) -> None:

@@ -25,7 +25,7 @@ def main() -> None:
     parser.add_argument("--min-parse-success-fraction", type=float, default=0.8)
     parser.add_argument("--min-monthly-rent", type=Decimal, default=Decimal("100"))
     parser.add_argument("--max-monthly-rent", type=Decimal, default=Decimal("100000"))
-    parser.add_argument("--max-duration-seconds", type=float, default=7200)
+    parser.add_argument("--max-duration-seconds", type=float, default=14400)
     parser.add_argument(
         "--allow-truncated-initial",
         action="store_true",

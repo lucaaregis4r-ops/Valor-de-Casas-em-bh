@@ -24,7 +24,7 @@ O coletor mantém o histórico local em PostgreSQL e atualiza os JSONs públicos
 
 ## Execução diária neste computador
 
-O agendamento roda às 05:00 no fuso horário do sistema (`America/Sao_Paulo`). O computador precisa estar ligado e conectado à internet. O PostgreSQL roda em um contêiner Docker local, limitado a `127.0.0.1`, com volume persistente.
+O agendamento roda às 05:00 no fuso horário do sistema (`America/Sao_Paulo`). A coleta pode levar até 4 horas antes de ser interrompida; o computador precisa permanecer ligado e conectado à internet. O PostgreSQL roda em um contêiner Docker local, limitado a `127.0.0.1`, com volume persistente.
 
 Na primeira configuração, o usuário local cria `.env` a partir de `.env.example`, define uma senha longa para o banco e executa:
 

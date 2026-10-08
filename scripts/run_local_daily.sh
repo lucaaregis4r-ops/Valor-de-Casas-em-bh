@@ -49,7 +49,7 @@ collect_status=0
   --min-parse-success-fraction "${PIPELINE_MIN_PARSE_SUCCESS_FRACTION:-0.8}" \
   --min-monthly-rent "${PIPELINE_MIN_MONTHLY_RENT:-100}" \
   --max-monthly-rent "${PIPELINE_MAX_MONTHLY_RENT:-100000}" \
-  --max-duration-seconds "${PIPELINE_MAX_DURATION_SECONDS:-7200}" || collect_status=$?
+  --max-duration-seconds "${PIPELINE_MAX_DURATION_SECONDS:-14400}" || collect_status=$?
 
 # Export even after a rejected collection so the public health status is updated
 # while the last accepted snapshot remains intact.

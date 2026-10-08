@@ -73,7 +73,7 @@ class QuintoAndarCollector(Collector):
         max_pages: int = 100,
         delay_seconds: float = 1.0,
         limit_sitemaps: int | None = None,
-        max_duration_seconds: float = 7200,
+        max_duration_seconds: float = 14400,
         fetch_text: Callable[[str], str] | None = None,
         geocoding_cache: NeighborhoodGeocodingCache | None = None,
     ):
