@@ -4,6 +4,13 @@ set -euo pipefail
 PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
+mkdir -p logs
+exec 9>logs/.run_local_daily.lock
+if ! flock -n 9; then
+  echo "Já existe uma execução diária em andamento." >&2
+  exit 4
+fi
+
 if [[ ! -f .env ]]; then
   echo "Arquivo .env ausente. Copie .env.example para .env e configure a senha local do banco." >&2
   exit 2
