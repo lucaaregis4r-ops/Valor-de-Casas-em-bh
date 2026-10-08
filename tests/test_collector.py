@@ -1,5 +1,7 @@
 import unittest
+from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
+from io import StringIO
 from pathlib import Path
 from urllib.error import HTTPError
 
@@ -30,9 +32,15 @@ def fixture_fetch(url):
 class QuintoAndarCollectorTests(unittest.TestCase):
     def test_collects_and_normalizes_public_structured_listing(self):
         collector = QuintoAndarCollector(delay_seconds=0, fetch_text=fixture_fetch)
-        records = collector.collect()
+        output = StringIO()
+        with redirect_stdout(output):
+            records = collector.collect()
 
         self.assertEqual(len(records), 1)
+        self.assertIn("Páginas de anúncios para consultar: 1", output.getvalue())
+        self.assertIn("[1/1] Anúncio lido 1: ID 895532233", output.getvalue())
+        self.assertIn("Prado, Belo Horizonte", output.getvalue())
+        self.assertIn("Páginas tentadas: 1; anúncios encontrados: 1", output.getvalue())
         self.assertEqual(records[0]["listing_id"], "895532233")
         self.assertEqual(records[0]["title"], "Apartamento de 2 quartos no Prado")
         self.assertEqual(records[0]["property_type"], "apartment")

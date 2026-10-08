@@ -172,6 +172,8 @@ class QuintoAndarCollector(Collector):
 
         self._metrics["candidate_pages"] = len(candidates)
         self._metrics["truncated"] = len(candidates) > self.max_pages
+        target_pages = min(len(candidates), self.max_pages)
+        print(f"Coleta iniciada. Páginas de anúncios para consultar: {target_pages}.", flush=True)
         records: list[dict[str, Any]] = []
         attempted = 0
         for entry in candidates:
@@ -213,6 +215,19 @@ class QuintoAndarCollector(Collector):
 
             records.append(row)
             self._metrics["records_parsed"] = len(records)
+            print(
+                f"[{attempted}/{target_pages}] Anúncio lido {len(records)}: "
+                f"ID {row.get('listing_id') or '?'} | "
+                f"{row.get('neighborhood') or 'bairro não informado'}, "
+                f"{row.get('city') or 'cidade não informada'} | "
+                f"aluguel R$ {row.get('price') or '?'}",
+                flush=True,
+            )
+        print(
+            f"Leitura concluída. Páginas tentadas: {attempted}; "
+            f"anúncios encontrados: {len(records)}.",
+            flush=True,
+        )
         return records
 
     def normalize(self, item: dict[str, Any], observed_at):
