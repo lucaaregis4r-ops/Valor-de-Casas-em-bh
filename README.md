@@ -50,6 +50,7 @@ O histórico completo fica no volume Docker `observatorio_postgres_data`; não �
 Clique em `Executar coleta manual.sh` na pasta do projeto ou no atalho `Executar coleta Moradia BH` na área de trabalho. Uma janela de terminal mostra o andamento e mantém o resultado visível até você pressionar Enter. O registro fica em `logs/manual_*.log`.
 
 Durante a coleta, o terminal mostra cada anúncio lido com ID, bairro e aluguel. Os dados só são publicados depois que o lote completo passa pela validação.
+Para interromper uma execução manual, pressione `Ctrl+C` no terminal. A interrupção é registrada no histórico; uma nova execução começa do início.
 
 Também é possível executar no terminal:
 

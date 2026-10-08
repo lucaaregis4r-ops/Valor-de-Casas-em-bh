@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import signal
 from decimal import Decimal
 from pathlib import Path
 
@@ -78,5 +79,11 @@ def main() -> None:
     )
 
 
+def _handle_shutdown(signum, _frame) -> None:
+    raise InterruptedError(f"coleta interrompida ({signal.Signals(signum).name})")
+
+
 if __name__ == "__main__":
+    for shutdown_signal in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        signal.signal(shutdown_signal, _handle_shutdown)
     main()
