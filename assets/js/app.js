@@ -4,6 +4,7 @@ import { norm, selectedFilters, baseFilter, groupByNeighborhood, neighborhoodMed
 import { loadPublicData, currentListings, neighborhoodDaily, listingEvents, publicMeta } from './public-data.js';
 import { neighborhoodNames, neighborhoodSlug, profileLink, renderDirectory, renderProfile, renderComparison } from './neighborhoods.js';
 import { createDailyMarket } from './daily-market.js';
+import { createMosaic } from './mosaic.js';
 
 let allPoints = [];
 let allCities = [];
@@ -14,6 +15,7 @@ let mode = 'delta';
 let viewFamily = 'historical';
 let currentView = 'map';
 let names = [];
+let mosaic = null;
 
 function relativeColor(value) {
   if (value === null || Number.isNaN(value)) return '#94a3b8';
@@ -759,25 +761,36 @@ function navigate() {
     if (active) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
+  if (!explore) mosaic.hide();
   if (profile) renderProfile(route.slice(7), allPoints, currentListings, neighborhoodDaily, publicMeta, names);
   if (explore) {
     const home = currentView === 'map';
     const daily = currentView === 'agora';
     viewFamily = daily ? 'daily' : 'historical';
     document.getElementById('homeChoices').hidden = !home;
+    document.getElementById('mosaicControls').hidden = !home;
+    document.getElementById('mosaicAreaBar').hidden = !home;
+    document.getElementById('mosaicDetail').hidden = !home;
+    document.getElementById('historicalControls').hidden = home || daily;
+    document.getElementById('dailyControls').hidden = !daily;
+    document.getElementById('configToggle').hidden = home;
+    document.getElementById('configPanel').hidden = home || document.getElementById('configToggle').getAttribute('aria-expanded') !== 'true';
     document.getElementById('analysisSection').hidden = home;
     document.getElementById('comparisonSection').hidden = currentView !== 'atlas';
     document.getElementById('collectionStatus').hidden = !daily;
-    document.getElementById('viewKicker').textContent = daily ? '02 / COLETAS RECENTES' : home ? 'CARTOGRAFIA DO MORAR · BELO HORIZONTE' : '01 / ATLAS HISTÓRICO';
+    document.getElementById('viewKicker').textContent = daily ? '02 / COLETAS RECENTES' : home ? 'CARTOGRAFIA DO MORAR · REGIÃO METROPOLITANA DE BH' : '01 / ATLAS HISTÓRICO';
     document.getElementById('viewTitle').textContent = daily ? 'Mercado Agora' : home ? 'O custo de morar, no mapa.' : 'Atlas do morar';
     document.getElementById('viewIntro').textContent = daily
       ? 'Acompanhe os anúncios de aluguel observados nas coletas, a oferta e seus movimentos recentes.'
-      : home ? 'Explore a transformação histórica do mercado residencial e acompanhe as ofertas coletadas recentemente.'
+      : home ? 'Clique em uma cidade para abrir seu mapa e ver os preços pedidos em cada região. Em BH, explore também os bairros. Escolha venda ou aluguel para comparar leituras diferentes.'
         : 'Compare os preços pedidos de venda de 2021 e 2026, bairro a bairro.';
     document.getElementById('analysisEyebrow').textContent = daily ? 'OFERTA OBSERVADA' : 'LEITURA HISTÓRICA';
     document.getElementById('analysisTitle').textContent = daily ? 'Resumo da coleta selecionada' : 'Panorama da área selecionada';
     document.getElementById('dailyMetric').value = daily && document.getElementById('dailyMetric').value === 'median_price_m2' ? 'active' : document.getElementById('dailyMetric').value;
-    redraw();
+    document.getElementById('mapAreaLabel').textContent = home ? 'Clique numa cidade para ver suas regiões' : 'Belo Horizonte e região metropolitana';
+    document.getElementById('mapInteractionHint').textContent = home ? 'Clique numa cidade · escolha o período acima · explore as regiões' : 'Arraste para explorar · clique nos pontos para detalhes';
+    if (home) mosaic.show();
+    else { mosaic.hide(); redraw(); }
     requestAnimationFrame(() => map.invalidateSize());
   }
   window.scrollTo({top:0, behavior:'instant'});
@@ -798,6 +811,8 @@ async function initializeApp() {
   allPoints = [...points2021, ...points2026];
   allCities = [...new Set(allPoints.map(point => point.city).filter(Boolean))];
   allNeighborhoods = [...new Set(allPoints.map(point => point.neighborhood).filter(Boolean))];
+
+  mosaic = await createMosaic(allPoints, currentListings);
 
   renderCollectionStatus();
   fillSelects();

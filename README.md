@@ -2,7 +2,7 @@
 
 Observatório cartográfico do mercado residencial de Belo Horizonte. O site estático apresenta ambientes separados:
 
-- **Mapa:** entrada cartográfica com acesso ao Atlas e ao Mercado Agora.
+- **Mapa:** mosaico das 34 cidades da RMBH; BH abre seus bairros e as demais cidades abrem uma grade de regiões internas.
 - **Atlas:** anúncios históricos de venda de 2021 e 2026, variação da mediana do preço pedido por m², rankings, camadas de aluguel da base 2026 e comparação entre bairros.
 - **Mercado Agora:** anúncios ativos de aluguel, eventos e agregados das coletas recentes, com data e comparação opcional entre coletas.
 - **Bairros:** índice e perfis que mostram o histórico de venda e a oferta atual de aluguel em blocos distintos.
@@ -17,6 +17,22 @@ python3 -m http.server 8000
 Abra `http://localhost:8000`. Abrir o HTML diretamente como arquivo pode impedir o carregamento dos JSONs.
 
 O frontend está em `index.html` e `assets/css/app.css`. `assets/js/app.js` concentra as camadas do Atlas e a navegação; `daily-market.js` contém o Mercado Agora; `neighborhoods.js` contém índice, perfis e comparação de bairros. `map.js`, `filters.js`, `statistics.js` e `public-data.js` compartilham mapa, filtros, cálculos e carregamento. O pipeline de coleta permanece em `pipeline/`.
+
+## Mosaico metropolitano
+
+A página **Mapa** usa os limites das 34 cidades do conjunto [Municípios RMBH da Fundação João Pinheiro/PBH](https://ckan.pbh.gov.br/dataset/municipio-rmbh), recurso `20260101_municipio_rmbh`, e os limites de 493 bairros, conjuntos e vilas de BH do [Bairro Popular da PBH/Prodabel](https://ckan.pbh.gov.br/dataset/bairro-popular), recurso `20240902_bairro_popular`, ambos CC BY. As malhas originais em EPSG:31983 foram convertidas para GeoJSON (EPSG:4326). As cidades fora de BH foram subdivididas em células de 1 km e os bairros de BH em células de 400 m, sempre recortadas pelos respectivos limites. A grade municipal não representa bairros oficiais. Os arquivos publicados estão em `data/geography/`; `assets/js/mosaic.js` cruza as coordenadas dos anúncios com as malhas durante o carregamento do site.
+
+Clique numa cidade ou use o seletor **Cidade** para abrir seu mapa. Em BH, clique num bairro ou use o seletor **Bairro** para ver suas regiões de 400 m. O seletor de preços alterna venda 2021, venda 2026, aluguel da base 2026 e aluguel ativo. As cores representam a mediana do preço pedido por m²; cidades e bairros precisam de pelo menos 5 anúncios e células de pelo menos 3 para receber cor. Pontos com coordenadas são mostrados no detalhe. Anúncios do Mercado Agora com `location_precision=neighborhood` entram apenas no total da cidade ou do bairro, sem criar uma falsa distribuição dentro da grade. A posição informada por uma fonte também pode ser aproximada; confira o endereço original antes de interpretar uma célula como localização exata.
+
+Para atualizar a malha, baixe o CSV da PBH e execute:
+
+```bash
+.venv/bin/python -m pip install shapely pyproj
+.venv/bin/python scripts/build_bh_mosaic.py 20240902_bairro_popular.csv
+.venv/bin/python scripts/build_rmbh_mosaic.py 20260101_municipio_rmbh.csv
+```
+
+Os scripts geram as quatro malhas GeoJSON; `shapely` e `pyproj` são dependências apenas dessa etapa de geração, não do site publicado.
 
 As bases históricas ficam em `data/baseline/2021.json` e `2026.json`. Os snapshots de anúncios e os agregados diários ficam em `data/public/`. O Atlas compara medianas de anúncios de **venda**; o Mercado Agora descreve principalmente anúncios observados de **aluguel**. Essas medidas não formam uma única série temporal. Amostras insuficientes são identificadas nos perfis e na comparação.
 
