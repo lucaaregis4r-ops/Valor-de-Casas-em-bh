@@ -3,7 +3,7 @@ import { median, percentile, mean, interpolateColor, priceStops, deltaStops, con
 import { norm, selectedFilters, baseFilter, groupByNeighborhood, neighborhoodMedians, cityMedian } from './filters.js';
 import { loadPublicData, currentListings, neighborhoodDaily, listingEvents, publicMeta } from './public-data.js';
 import { neighborhoodNames, neighborhoodSlug, profileLink, renderDirectory, renderProfile, renderComparison } from './neighborhoods.js';
-import { createDailyMarket } from './daily-market.js';
+import { createDailyMarket } from './daily-market.js?v=20261010g';
 import { createMosaic } from './mosaic.js';
 
 let allPoints = [];
@@ -733,6 +733,34 @@ function bindControls() {
   document.getElementById('modeDelta').onclick = () => {mode='delta'; redraw();};
   document.getElementById('modeRent').onclick = () => {mode='rent'; redraw();};
   ['typeFilter','cityFilter','neighborhoodFilter','minSamples','deltaStyle','priceStyle','cellSize','rentMetric','dailyMetric'].forEach(id => document.getElementById(id).addEventListener('change', redraw));
+  let previousPriceView = document.getElementById('dailyPriceView').value;
+  document.getElementById('dailyPriceView').addEventListener('change', () => {
+    const nextPriceView = document.getElementById('dailyPriceView').value;
+    const perSquareMeter = nextPriceView === 'price_m2';
+    for (const id of ['dailyPriceMin','dailyPriceMax']) {
+      const input = document.getElementById(id);
+      if (perSquareMeter || previousPriceView === 'price_m2') input.value = '';
+      input.step = perSquareMeter ? '5' : '100';
+      input.placeholder = perSquareMeter ? (id === 'dailyPriceMin' ? 'R$/m² mínimo' : 'R$/m² máximo')
+        : (id === 'dailyPriceMin' ? 'R$ mínimo' : 'R$ máximo');
+    }
+    previousPriceView = nextPriceView;
+    redraw();
+  });
+  let priceFilterTimer;
+  for (const id of ['dailyPriceMin','dailyPriceMax']) {
+    const input = document.getElementById(id);
+    input.addEventListener('change', () => { clearTimeout(priceFilterTimer); redraw(); });
+    input.addEventListener('input', () => {
+      clearTimeout(priceFilterTimer);
+      priceFilterTimer = setTimeout(redraw, 200);
+    });
+  }
+  document.getElementById('dailyPriceClear').addEventListener('click', () => {
+    document.getElementById('dailyPriceMin').value = '';
+    document.getElementById('dailyPriceMax').value = '';
+    redraw();
+  });
   document.getElementById('radius').addEventListener('input', redraw);
   document.getElementById('dailyDate').addEventListener('change', redraw);
   document.getElementById('dailyCompareDate').addEventListener('change', redraw);
@@ -771,6 +799,8 @@ function navigate() {
     document.getElementById('mosaicControls').hidden = !home;
     document.getElementById('mosaicAreaBar').hidden = !home;
     document.getElementById('mosaicDetail').hidden = !home;
+    document.getElementById('dailyPriceTools').hidden = !daily;
+    document.getElementById('dailyDeals').hidden = !daily;
     document.getElementById('historicalControls').hidden = home || daily;
     document.getElementById('dailyControls').hidden = !daily;
     document.getElementById('configToggle').hidden = home;
