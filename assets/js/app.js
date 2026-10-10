@@ -782,7 +782,7 @@ function navigate() {
     document.getElementById('viewTitle').textContent = daily ? 'Mercado Agora' : home ? 'O custo de morar, no mapa.' : 'Atlas do morar';
     document.getElementById('viewIntro').textContent = daily
       ? 'Acompanhe os anúncios de aluguel observados nas coletas, a oferta e seus movimentos recentes.'
-      : home ? 'Clique em uma cidade para abrir seu mapa e ver os preços pedidos em cada região. BH, Contagem e Betim também têm divisão por bairros. Escolha venda ou aluguel para comparar leituras diferentes.'
+      : home ? 'Clique em uma cidade para abrir seu mapa e ver os preços pedidos em cada região. BH, Contagem, Betim e Nova Lima também têm divisão por bairros e áreas. Escolha venda ou aluguel para comparar leituras diferentes.'
         : 'Compare os preços pedidos de venda de 2021 e 2026, bairro a bairro.';
     document.getElementById('analysisEyebrow').textContent = daily ? 'OFERTA OBSERVADA' : 'LEITURA HISTÓRICA';
     document.getElementById('analysisTitle').textContent = daily ? 'Resumo da coleta selecionada' : 'Panorama da área selecionada';

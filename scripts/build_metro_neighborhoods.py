@@ -1,10 +1,11 @@
-"""Gera bairros e células de 400 m para Contagem e Betim.
+"""Gera bairros e células de 400 m para Contagem, Betim e Nova Lima.
 
-Uso: python scripts/build_metro_neighborhoods.py contagem.geojson betim.zip
+Uso: python scripts/build_metro_neighborhoods.py contagem.geojson betim.zip nova_lima.geojson
 Dependências de geração: shapely, pyproj, pyshp.
 
 Contagem: https://geoprocessamento.contagem.mg.gov.br/arcgis/rest/services/SIGM_BD_Publico/Divisao_Territorial_Publico/FeatureServer/0
 Betim: https://www.betim.mg.gov.br/portal/secretarias-paginas/308/cartografia/
+Nova Lima (proposta não validada): https://services3.arcgis.com/8p5P2iPRkT0RXnI3/arcgis/rest/services/Proposta_de_Limite_de_Bairros/FeatureServer/0
 """
 
 import json
@@ -38,7 +39,7 @@ def municipal_shapes():
             for feature in data["features"]}
 
 
-def source_features(contagem_path, betim_path):
+def source_features(contagem_path, betim_path, nova_lima_path):
     contagem = json.loads(Path(contagem_path).read_text(encoding="utf-8"))
     for feature in contagem["features"]:
         props = feature["properties"]
@@ -51,13 +52,17 @@ def source_features(contagem_path, betim_path):
         for feature in reader.iterShapeRecords():
             props = feature.record.as_dict()
             yield "11", f"11:{props['PKIDBAIRRO']}", props["NOMBAIRRO"].strip().title(), shape(feature.shape.__geo_interface__)
+    nova_lima = json.loads(Path(nova_lima_path).read_text(encoding="utf-8"))
+    for feature in nova_lima["features"]:
+        props = feature["properties"]
+        yield "27", f"27:{props['OBJECTID']}", props["LOTEAMENTO"].strip().title(), to_meters(shape(feature["geometry"]))
 
 
-def main(contagem_path, betim_path):
+def main(contagem_path, betim_path, nova_lima_path):
     cities = municipal_shapes()
     neighborhoods = []
     cells = []
-    for city_code, code, name, source_shape in source_features(contagem_path, betim_path):
+    for city_code, code, name, source_shape in source_features(contagem_path, betim_path, nova_lima_path):
         if not source_shape.is_valid:
             source_shape = make_valid(source_shape)
         geometry = polygons_only(source_shape.intersection(cities[city_code]))
@@ -77,7 +82,10 @@ def main(contagem_path, betim_path):
                     continue
                 cells.append({"type": "Feature", "properties": {"id": f"{code}:{ix}:{iy}", "code": code,
                     "cityCode": city_code}, "geometry": rounded_shape(clipped)})
-    if len(neighborhoods) < 500 or len({feature["properties"]["code"] for feature in neighborhoods}) != len(neighborhoods):
+    counts = {city_code: sum(feature["properties"]["cityCode"] == city_code for feature in neighborhoods)
+              for city_code in ("11", "27", "32")}
+    if any(counts[city_code] < minimum for city_code, minimum in (("11", 300), ("27", 100), ("32", 200))) \
+            or len({feature["properties"]["code"] for feature in neighborhoods}) != len(neighborhoods):
         raise ValueError("A malha de bairros está incompleta ou contém códigos repetidos")
     OUT.mkdir(parents=True, exist_ok=True)
     for filename, features in (("metro_neighborhoods.geojson", neighborhoods),
@@ -89,6 +97,6 @@ def main(contagem_path, betim_path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        raise SystemExit("Uso: python scripts/build_metro_neighborhoods.py contagem.geojson betim.zip")
-    main(sys.argv[1], sys.argv[2])
+    if len(sys.argv) != 4:
+        raise SystemExit("Uso: python scripts/build_metro_neighborhoods.py contagem.geojson betim.zip nova_lima.geojson")
+    main(sys.argv[1], sys.argv[2], sys.argv[3])

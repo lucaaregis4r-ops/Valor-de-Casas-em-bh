@@ -203,13 +203,15 @@ export async function createMosaic(historical, current) {
           ? 'Clique numa região ou ponto para ver os preços · use a seta para voltar'
           : 'Clique numa cidade · escolha o período acima · explore as regiões';
     document.getElementById('mapCaption').textContent = selected
-      ? 'Células de 400 m com escala de cores própria do bairro e ruas visíveis sob a camada. Preços pedidos, não valores de transação.'
+      ? `${selectedCity.properties.name === 'Nova Lima' ? 'Limites propostos pela prefeitura, ainda não validados. ' : ''}Células de 400 m com escala de cores própria do bairro e ruas visíveis sob a camada. Preços pedidos, não valores de transação.`
       : hasNeighborhoods
         ? String(selectedCity.properties.code) === bhCode
           ? 'Bairros: PBH/Prodabel, Bairro Popular 2024. Clique num bairro para ver as regiões de 400 m.'
           : selectedCity.properties.name === 'Contagem'
             ? 'Bairros e loteamentos: Prefeitura de Contagem. Clique numa área para ver regiões de 400 m.'
-            : 'Bairros: Prefeitura de Betim, mapa de março de 2026. Clique num bairro para ver regiões de 400 m.'
+            : selectedCity.properties.name === 'Nova Lima'
+              ? 'Bairros/loteamentos: proposta da Prefeitura de Nova Lima, ainda não validada. Clique numa área para ver regiões de 400 m.'
+              : 'Bairros: Prefeitura de Betim, mapa de março de 2026. Clique num bairro para ver regiões de 400 m.'
         : selectedCity
           ? 'Grade de 1 km recortada pelo município. Regiões cinzas têm menos de 3 anúncios localizados.'
           : 'Municípios: Fundação João Pinheiro/PBH, RMBH 2026. Cor = mediana do preço pedido por m²; cinza = amostra pequena.';
@@ -285,7 +287,8 @@ export async function createMosaic(historical, current) {
     addLegend(metrics[activeMetric].label, 5, cap);
     map.fitBounds(layer.getBounds().pad(.025), {animate:false});
     const unzoned = activePoints.length - zoned.length;
-    updateHeader(selectedCity.properties.name, `${number.format(cityNeighborhoods.length)} bairros/áreas · ${number.format(activePoints.length)} anúncios no município · ${number.format(zoned.length)} nas áreas${unzoned ? ` · ${number.format(unzoned)} fora das áreas` : ''}`);
+    const areaLabel = selectedCity.properties.name === 'Nova Lima' ? 'áreas propostas' : 'bairros/áreas';
+    updateHeader(selectedCity.properties.name, `${number.format(cityNeighborhoods.length)} ${areaLabel} · ${number.format(activePoints.length)} anúncios no município · ${number.format(zoned.length)} nas áreas${unzoned ? ` · ${number.format(unzoned)} fora das áreas` : ''}`);
     document.getElementById('mosaicDetail').hidden = true;
   }
 
@@ -478,7 +481,7 @@ export async function createMosaic(historical, current) {
     map.fitBounds(outline.getBounds().pad(.14), {animate:false, maxZoom:15});
     const value = points.length >= 5 ? median(points.map(p => p.price_m2)) : null;
     const colored = pricedRegions.length;
-    updateHeader(selected.properties.name, `${metrics[activeMetric].description} · ${number.format(points.length)} anúncios associados ao bairro`);
+    updateHeader(selected.properties.name, `${selectedCity.properties.name === 'Nova Lima' ? 'limites propostos, ainda não validados · ' : ''}${metrics[activeMetric].description} · ${number.format(points.length)} anúncios associados ao bairro`);
     const detail = document.getElementById('mosaicDetail');
     detail.hidden = false;
     const topRegions = pricedRegions.slice(0, 3).map((region, index) => `<button type="button" data-mosaic-cell="${escapeHtml(region.feature.properties.id)}"><b>${index + 1}ª região</b><strong>${money.format(region.price)}/m²</strong><small>${number.format(region.count)} anúncios · aproximar ruas ↗</small></button>`).join('');
@@ -486,7 +489,8 @@ export async function createMosaic(historical, current) {
       : 'Ainda não há anúncios suficientes para comparar as regiões deste bairro. As ruas e seus limites continuam visíveis.';
     const sourceNote = cityCode === bhCode ? 'PBH/Prodabel'
       : cityCode === '32' ? 'Prefeitura de Contagem (bairros e loteamentos, inclusive áreas não aprovadas)'
-        : 'Prefeitura de Betim';
+        : cityCode === '27' ? 'Prefeitura de Nova Lima (proposta ainda não validada)'
+          : 'Prefeitura de Betim';
     detail.innerHTML = `<div class="mosaic-detail-heading"><span>INTERIOR DO BAIRRO</span><h2>${escapeHtml(selected.properties.name)}</h2><p>${intro}</p></div><label class="mosaic-point-toggle"><input id="mosaicShowPoints" type="checkbox" ${showPoints ? 'checked' : ''}> Mostrar pontos dos anúncios</label><div class="mosaic-detail-stats"><div><strong>${value ? `${money.format(value)}/m²` : 'sem mediana'}</strong><span>Mediana do bairro · mínimo de 5 anúncios</span></div><div><strong>${number.format(assignedToCells)}</strong><span>Anúncios localizados na grade interna</span></div><div><strong>${number.format(colored)}</strong><span>Regiões com pelo menos 3 anúncios</span></div></div><div class="mosaic-top-regions"><h3>Regiões mais caras neste bairro</h3><p>Mediana do preço pedido em células de 400 m com pelo menos 3 anúncios.</p><div>${topRegions || '<span class="mosaic-empty">Ainda não há regiões com amostra suficiente.</span>'}</div></div><p class="mosaic-detail-note">${points.length - precise.length ? `${number.format(points.length - precise.length)} anúncio(s) com posição aproximada pelo bairro entram no total, mas não nas regiões internas. ` : ''}${precise.length - assignedToCells ? `${number.format(precise.length - assignedToCells)} anúncio(s) ficam no total do bairro, mas fora das células da grade. ` : ''}Cinza indica amostra pequena. Os limites são da ${sourceNote}; a atribuição dos imóveis usa suas coordenadas e pode divergir do bairro escrito no anúncio.</p>`;
     detail.querySelector('#mosaicShowPoints').addEventListener('change', event => {
       showPoints = event.target.checked;
