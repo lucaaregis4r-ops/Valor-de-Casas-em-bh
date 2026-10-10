@@ -62,22 +62,34 @@ const metrics = {
 };
 
 export async function createMosaic(historical, current) {
-  const [neighborhoodResponse, cityResponse] = await Promise.all([
+  const [neighborhoodResponse, cityResponse, metroNeighborhoodResponse] = await Promise.all([
     fetch('data/geography/bh_neighborhoods.geojson'),
     fetch('data/geography/rmbh_cities.geojson'),
+    fetch('data/geography/metro_neighborhoods.geojson'),
   ]);
-  if (!neighborhoodResponse.ok || !cityResponse.ok) throw new Error('Não foi possível carregar a malha da RMBH.');
-  const neighborhoods = (await neighborhoodResponse.json()).features;
+  if (!neighborhoodResponse.ok || !cityResponse.ok || !metroNeighborhoodResponse.ok) throw new Error('Não foi possível carregar a malha da RMBH.');
+  const bhNeighborhoods = (await neighborhoodResponse.json()).features;
   const cities = (await cityResponse.json()).features;
+  const metroNeighborhoods = (await metroNeighborhoodResponse.json()).features;
+  const bh = cities.find(feature => norm(feature.properties.name) === norm('Belo Horizonte'));
+  const bhCode = String(bh.properties.code);
+  bhNeighborhoods.forEach(feature => { feature.properties.cityCode = bhCode; });
+  const neighborhoods = [...bhNeighborhoods, ...metroNeighborhoods];
+  const neighborhoodsByCity = new Map();
+  neighborhoods.forEach(feature => {
+    const cityCode = String(feature.properties.cityCode);
+    if (!neighborhoodsByCity.has(cityCode)) neighborhoodsByCity.set(cityCode, []);
+    neighborhoodsByCity.get(cityCode).push(feature);
+  });
   const byCode = new Map(neighborhoods.map(feature => [String(feature.properties.code), feature]));
-  const byName = new Map(neighborhoods.map(feature => [norm(feature.properties.name), feature]));
+  const byName = new Map(neighborhoods.map(feature => [`${feature.properties.cityCode}:${norm(feature.properties.name)}`, feature]));
   const cityByCode = new Map(cities.map(feature => [String(feature.properties.code), feature]));
   const cityByName = new Map(cities.map(feature => [norm(feature.properties.name), feature]));
-  const bh = cityByName.get(norm('Belo Horizonte'));
-  const bhCode = String(bh.properties.code);
   const findCity = spatialIndex(cities);
-  const findNeighborhood = spatialIndex(neighborhoods);
-  let cells = null;
+  const findNeighborhoodByCity = new Map([...neighborhoodsByCity]
+    .map(([code, features]) => [code, spatialIndex(features)]));
+  let bhCells = null;
+  let metroNeighborhoodCells = null;
   let metroCells = null;
   let selectedCity = null;
   let selected = null;
@@ -86,7 +98,6 @@ export async function createMosaic(historical, current) {
   let active = false;
   let sequence = 0;
   let showPoints = false;
-  const wholeCityBounds = L.geoJSON({type:'FeatureCollection', features:neighborhoods}).getBounds();
   const metroBounds = L.geoJSON({type:'FeatureCollection', features:cities}).getBounds();
 
   function classify(items, approximate = false) {
@@ -98,9 +109,9 @@ export async function createMosaic(historical, current) {
           || (isApproximate ? cityByName.get(norm(item.city)) : null);
         if (!city) return null;
         const cityCode = String(city.properties.code);
-        const neighborhood = cityCode === bhCode
-          ? findNeighborhood(item.lon, item.lat)
-            || (isApproximate ? byName.get(norm(item.neighborhood)) : null) : null;
+        const locatedNeighborhood = findNeighborhoodByCity.get(cityCode)?.(item.lon, item.lat);
+        const neighborhood = locatedNeighborhood
+          || (isApproximate ? byName.get(`${cityCode}:${norm(item.neighborhood)}`) : null);
         return {...item, mosaicCityCode:cityCode, mosaicCode:neighborhood ? String(neighborhood.properties.code) : null,
           approximate:isApproximate};
       }).filter(Boolean);
@@ -113,9 +124,14 @@ export async function createMosaic(historical, current) {
     ...[...cities].sort((a,b) => a.properties.name.localeCompare(b.properties.name, 'pt-BR'))
       .map(feature => new Option(feature.properties.name, String(feature.properties.code))));
   const neighborhoodSelect = document.getElementById('mosaicNeighborhood');
-  const sorted = [...neighborhoods].sort((a,b) => a.properties.name.localeCompare(b.properties.name, 'pt-BR'));
-  neighborhoodSelect.replaceChildren(new Option('Escolha um bairro', ''),
-    ...sorted.map(feature => new Option(feature.properties.name, String(feature.properties.code))));
+  function populateNeighborhoodSelect() {
+    const code = selectedCity ? String(selectedCity.properties.code) : '';
+    const sorted = [...(neighborhoodsByCity.get(code) || [])]
+      .sort((a,b) => a.properties.name.localeCompare(b.properties.name, 'pt-BR'));
+    neighborhoodSelect.replaceChildren(new Option('Escolha um bairro', ''),
+      ...sorted.map(feature => new Option(feature.properties.name, String(feature.properties.code))));
+    neighborhoodSelect.value = selected ? String(selected.properties.code) : '';
+  }
 
   function pointSet() {
     const source = activeMetric === 'currentRent' ? classifiedCurrent : classifiedHistorical;
@@ -171,26 +187,31 @@ export async function createMosaic(historical, current) {
     document.getElementById('mosaicAreaSubtitle').textContent = subtitle;
     const back = document.getElementById('mosaicBack');
     back.hidden = !selectedCity;
-    back.textContent = selected ? '← Ver bairros de BH' : '← Ver cidades da região metropolitana';
+    back.textContent = selected ? `← Ver bairros de ${selectedCity.properties.name}` : '← Ver cidades da região metropolitana';
     citySelect.value = selectedCity ? String(selectedCity.properties.code) : '';
-    neighborhoodSelect.value = selected ? String(selected.properties.code) : '';
-    document.getElementById('mosaicNeighborhoodWrap').hidden = !selectedCity || String(selectedCity.properties.code) !== bhCode;
+    populateNeighborhoodSelect();
+    const hasNeighborhoods = selectedCity && neighborhoodsByCity.has(String(selectedCity.properties.code));
+    document.getElementById('mosaicNeighborhoodWrap').hidden = !hasNeighborhoods;
     document.getElementById('mapSourceLabel').textContent = `MOSAICO RMBH · ${metrics[activeMetric].label.toUpperCase()}`;
     document.getElementById('mapAreaLabel').textContent = selected ? selected.properties.name
       : selectedCity ? selectedCity.properties.name : 'Clique numa cidade para ver suas regiões';
     document.getElementById('mapInteractionHint').textContent = selected
       ? 'Clique numa região · ative os pontos dos anúncios abaixo do mapa'
-      : selectedCity && String(selectedCity.properties.code) === bhCode
+      : hasNeighborhoods
         ? 'Clique num bairro para ver suas regiões · use a seta para voltar'
         : selectedCity
           ? 'Clique numa região ou ponto para ver os preços · use a seta para voltar'
           : 'Clique numa cidade · escolha o período acima · explore as regiões';
     document.getElementById('mapCaption').textContent = selected
       ? 'Células de 400 m com escala de cores própria do bairro e ruas visíveis sob a camada. Preços pedidos, não valores de transação.'
-      : selectedCity && String(selectedCity.properties.code) !== bhCode
-        ? 'Grade de 1 km recortada pelo município. Regiões cinzas têm menos de 3 anúncios localizados.'
-        : selectedCity
+      : hasNeighborhoods
+        ? String(selectedCity.properties.code) === bhCode
           ? 'Bairros: PBH/Prodabel, Bairro Popular 2024. Clique num bairro para ver as regiões de 400 m.'
+          : selectedCity.properties.name === 'Contagem'
+            ? 'Bairros e loteamentos: Prefeitura de Contagem. Clique numa área para ver regiões de 400 m.'
+            : 'Bairros: Prefeitura de Betim, mapa de março de 2026. Clique num bairro para ver regiões de 400 m.'
+        : selectedCity
+          ? 'Grade de 1 km recortada pelo município. Regiões cinzas têm menos de 3 anúncios localizados.'
           : 'Municípios: Fundação João Pinheiro/PBH, RMBH 2026. Cor = mediana do preço pedido por m²; cinza = amostra pequena.';
   }
 
@@ -234,9 +255,10 @@ export async function createMosaic(historical, current) {
 
   function drawCity() {
     clearMap();
-    selectedCity = bh;
     selected = null;
-    activePoints = pointSet().filter(p => p.mosaicCityCode === bhCode);
+    const cityCode = String(selectedCity.properties.code);
+    const cityNeighborhoods = neighborhoodsByCity.get(cityCode) || [];
+    activePoints = pointSet().filter(p => p.mosaicCityCode === cityCode);
     const zoned = activePoints.filter(p => p.mosaicCode);
     const groups = new Map();
     zoned.forEach(p => {
@@ -244,7 +266,7 @@ export async function createMosaic(historical, current) {
       groups.get(p.mosaicCode).push(p);
     });
     const cap = percentile(zoned.map(p => p.price_m2), .95) || 1;
-    const layer = L.geoJSON({type:'FeatureCollection', features:neighborhoods}, {
+    const layer = L.geoJSON({type:'FeatureCollection', features:cityNeighborhoods}, {
       style: feature => {
         const points = groups.get(String(feature.properties.code)) || [];
         const value = points.length >= 5 ? median(points.map(p => p.price_m2)) : null;
@@ -261,9 +283,9 @@ export async function createMosaic(historical, current) {
     }).addTo(map);
     currentLayers.push(layer);
     addLegend(metrics[activeMetric].label, 5, cap);
-    map.fitBounds(wholeCityBounds.pad(.025), {animate:false});
+    map.fitBounds(layer.getBounds().pad(.025), {animate:false});
     const unzoned = activePoints.length - zoned.length;
-    updateHeader('Belo Horizonte', `${number.format(neighborhoods.length)} áreas oficiais · ${number.format(activePoints.length)} anúncios no município · ${number.format(zoned.length)} nos bairros${unzoned ? ` · ${number.format(unzoned)} sem bairro na malha` : ''}`);
+    updateHeader(selectedCity.properties.name, `${number.format(cityNeighborhoods.length)} bairros/áreas · ${number.format(activePoints.length)} anúncios no município · ${number.format(zoned.length)} nas áreas${unzoned ? ` · ${number.format(unzoned)} fora das áreas` : ''}`);
     document.getElementById('mosaicDetail').hidden = true;
   }
 
@@ -281,7 +303,7 @@ export async function createMosaic(historical, current) {
     const request = ++sequence;
     selectedCity = target;
     selected = null;
-    if (code === bhCode) { drawCity(); return; }
+    if (neighborhoodsByCity.has(code)) { drawCity(); return; }
     updateHeader(target.properties.name, 'Carregando as regiões da cidade…');
     try {
       await loadMetroCells();
@@ -351,17 +373,23 @@ export async function createMosaic(historical, current) {
   }
 
   async function loadCells() {
-    if (cells) return cells;
-    const response = await fetch('data/geography/bh_cells_400m.geojson');
+    const cityCode = String(selectedCity.properties.code);
+    if (cityCode === bhCode && bhCells) return bhCells;
+    if (cityCode !== bhCode && metroNeighborhoodCells) return metroNeighborhoodCells;
+    const response = await fetch(cityCode === bhCode
+      ? 'data/geography/bh_cells_400m.geojson'
+      : 'data/geography/metro_neighborhood_cells_400m.geojson');
     if (!response.ok) throw new Error('Não foi possível carregar as regiões dos bairros.');
-    cells = (await response.json()).features;
-    return cells;
+    const features = (await response.json()).features;
+    if (cityCode === bhCode) bhCells = features;
+    else metroNeighborhoodCells = features;
+    return features;
   }
 
   async function openNeighborhood(code) {
     const target = byCode.get(code);
     if (!target) return;
-    selectedCity = bh;
+    selectedCity = cityByCode.get(String(target.properties.cityCode));
     selected = target;
     const request = ++sequence;
     updateHeader(target.properties.name, 'Carregando as regiões do bairro…');
@@ -378,11 +406,13 @@ export async function createMosaic(historical, current) {
   function drawNeighborhood() {
     if (!selected) return;
     clearMap();
-    activePoints = pointSet().filter(p => p.mosaicCityCode === bhCode && p.mosaicCode);
+    const cityCode = String(selectedCity.properties.code);
+    activePoints = pointSet().filter(p => p.mosaicCityCode === cityCode && p.mosaicCode);
     const code = String(selected.properties.code);
-    const points = activePoints.filter(p => p.mosaicCityCode === bhCode && p.mosaicCode === code);
+    const points = activePoints.filter(p => p.mosaicCode === code);
     const precise = points.filter(p => !p.approximate);
-    const cellFeatures = cells.filter(feature => String(feature.properties.code) === code);
+    const sourceCells = cityCode === bhCode ? bhCells : metroNeighborhoodCells;
+    const cellFeatures = sourceCells.filter(feature => String(feature.properties.code) === code);
     const findCell = spatialIndex(cellFeatures, .004);
     const groups = new Map();
     let assignedToCells = 0;
@@ -454,7 +484,10 @@ export async function createMosaic(historical, current) {
     const topRegions = pricedRegions.slice(0, 3).map((region, index) => `<button type="button" data-mosaic-cell="${escapeHtml(region.feature.properties.id)}"><b>${index + 1}ª região</b><strong>${money.format(region.price)}/m²</strong><small>${number.format(region.count)} anúncios · aproximar ruas ↗</small></button>`).join('');
     const intro = colored ? 'As cores comparam as regiões deste bairro. As ruas continuam visíveis sob a camada translúcida; clique numa região ou aproxime pelo ranking.'
       : 'Ainda não há anúncios suficientes para comparar as regiões deste bairro. As ruas e seus limites continuam visíveis.';
-    detail.innerHTML = `<div class="mosaic-detail-heading"><span>INTERIOR DO BAIRRO</span><h2>${escapeHtml(selected.properties.name)}</h2><p>${intro}</p></div><label class="mosaic-point-toggle"><input id="mosaicShowPoints" type="checkbox" ${showPoints ? 'checked' : ''}> Mostrar pontos dos anúncios</label><div class="mosaic-detail-stats"><div><strong>${value ? `${money.format(value)}/m²` : 'sem mediana'}</strong><span>Mediana do bairro · mínimo de 5 anúncios</span></div><div><strong>${number.format(assignedToCells)}</strong><span>Anúncios localizados na grade interna</span></div><div><strong>${number.format(colored)}</strong><span>Regiões com pelo menos 3 anúncios</span></div></div><div class="mosaic-top-regions"><h3>Regiões mais caras neste bairro</h3><p>Mediana do preço pedido em células de 400 m com pelo menos 3 anúncios.</p><div>${topRegions || '<span class="mosaic-empty">Ainda não há regiões com amostra suficiente.</span>'}</div></div><p class="mosaic-detail-note">${points.length - precise.length ? `${number.format(points.length - precise.length)} anúncio(s) com posição aproximada pelo bairro entram no total, mas não nas regiões internas. ` : ''}${precise.length - assignedToCells ? `${number.format(precise.length - assignedToCells)} anúncio(s) ficam no total do bairro, mas fora das células da grade. ` : ''}Cinza indica amostra pequena. Os limites são da PBH/Prodabel; a atribuição dos imóveis usa suas coordenadas e pode divergir do bairro escrito no anúncio.</p>`;
+    const sourceNote = cityCode === bhCode ? 'PBH/Prodabel'
+      : cityCode === '32' ? 'Prefeitura de Contagem (bairros e loteamentos, inclusive áreas não aprovadas)'
+        : 'Prefeitura de Betim';
+    detail.innerHTML = `<div class="mosaic-detail-heading"><span>INTERIOR DO BAIRRO</span><h2>${escapeHtml(selected.properties.name)}</h2><p>${intro}</p></div><label class="mosaic-point-toggle"><input id="mosaicShowPoints" type="checkbox" ${showPoints ? 'checked' : ''}> Mostrar pontos dos anúncios</label><div class="mosaic-detail-stats"><div><strong>${value ? `${money.format(value)}/m²` : 'sem mediana'}</strong><span>Mediana do bairro · mínimo de 5 anúncios</span></div><div><strong>${number.format(assignedToCells)}</strong><span>Anúncios localizados na grade interna</span></div><div><strong>${number.format(colored)}</strong><span>Regiões com pelo menos 3 anúncios</span></div></div><div class="mosaic-top-regions"><h3>Regiões mais caras neste bairro</h3><p>Mediana do preço pedido em células de 400 m com pelo menos 3 anúncios.</p><div>${topRegions || '<span class="mosaic-empty">Ainda não há regiões com amostra suficiente.</span>'}</div></div><p class="mosaic-detail-note">${points.length - precise.length ? `${number.format(points.length - precise.length)} anúncio(s) com posição aproximada pelo bairro entram no total, mas não nas regiões internas. ` : ''}${precise.length - assignedToCells ? `${number.format(precise.length - assignedToCells)} anúncio(s) ficam no total do bairro, mas fora das células da grade. ` : ''}Cinza indica amostra pequena. Os limites são da ${sourceNote}; a atribuição dos imóveis usa suas coordenadas e pode divergir do bairro escrito no anúncio.</p>`;
     detail.querySelector('#mosaicShowPoints').addEventListener('change', event => {
       showPoints = event.target.checked;
       if (showPoints) dots.addTo(map);
@@ -477,8 +510,9 @@ export async function createMosaic(historical, current) {
   document.getElementById('mosaicMetric').addEventListener('change', event => {
     activeMetric = event.target.value;
     if (!active) return;
-    if (selected) cells ? drawNeighborhood() : openNeighborhood(String(selected.properties.code));
-    else if (selectedCity) String(selectedCity.properties.code) === bhCode ? drawCity()
+    if (selected) (String(selectedCity.properties.code) === bhCode ? bhCells : metroNeighborhoodCells)
+      ? drawNeighborhood() : openNeighborhood(String(selected.properties.code));
+    else if (selectedCity) neighborhoodsByCity.has(String(selectedCity.properties.code)) ? drawCity()
       : metroCells ? drawMunicipality() : openCity(String(selectedCity.properties.code));
     else drawMetro();
   });
@@ -503,8 +537,9 @@ export async function createMosaic(historical, current) {
   }
 
   function showSelected() {
-    if (selected) cells ? drawNeighborhood() : openNeighborhood(String(selected.properties.code));
-    else if (selectedCity) String(selectedCity.properties.code) === bhCode ? drawCity()
+    if (selected) (String(selectedCity.properties.code) === bhCode ? bhCells : metroNeighborhoodCells)
+      ? drawNeighborhood() : openNeighborhood(String(selected.properties.code));
+    else if (selectedCity) neighborhoodsByCity.has(String(selectedCity.properties.code)) ? drawCity()
       : metroCells ? drawMunicipality() : openCity(String(selectedCity.properties.code));
     else drawMetro();
   }
