@@ -95,14 +95,14 @@ export async function createMosaic(historical, current) {
   let selected = null;
   let activePoints = [];
   let activeMetric = 'sale2026';
+  let activeValue = 'price_m2';
   let active = false;
   let sequence = 0;
   let showPoints = false;
   const metroBounds = L.geoJSON({type:'FeatureCollection', features:cities}).getBounds();
 
   function classify(items, approximate = false) {
-    return items.filter(item => Number.isFinite(item.price_m2) && item.price_m2 > 0
-      && Number.isFinite(item.lat) && Number.isFinite(item.lon))
+    return items.filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lon))
       .map(item => {
         const isApproximate = approximate && item.location_precision === 'neighborhood';
         const city = findCity(item.lon, item.lat)
@@ -120,7 +120,7 @@ export async function createMosaic(historical, current) {
   const classifiedHistorical = classify(historical);
   const classifiedCurrent = classify(current, true);
   const citySelect = document.getElementById('mosaicCity');
-  citySelect.replaceChildren(new Option('Escolha uma cidade', ''),
+  citySelect.replaceChildren(new Option('Todas as cidades', ''),
     ...[...cities].sort((a,b) => a.properties.name.localeCompare(b.properties.name, 'pt-BR'))
       .map(feature => new Option(feature.properties.name, String(feature.properties.code))));
   const neighborhoodSelect = document.getElementById('mosaicNeighborhood');
@@ -128,14 +128,47 @@ export async function createMosaic(historical, current) {
     const code = selectedCity ? String(selectedCity.properties.code) : '';
     const sorted = [...(neighborhoodsByCity.get(code) || [])]
       .sort((a,b) => a.properties.name.localeCompare(b.properties.name, 'pt-BR'));
-    neighborhoodSelect.replaceChildren(new Option('Escolha um bairro', ''),
+    neighborhoodSelect.replaceChildren(new Option('Todos os bairros', ''),
       ...sorted.map(feature => new Option(feature.properties.name, String(feature.properties.code))));
     neighborhoodSelect.value = selected ? String(selected.properties.code) : '';
   }
 
+  function valueOf(item) {
+    return activeValue === 'price_m2' ? item.price_m2
+      : activeMetric === 'currentRent' ? item.total_price : item.price;
+  }
+
+  function valueLabel() {
+    if (activeValue === 'price_m2') return activeMetric.startsWith('sale') ? 'preço pedido por m²' : 'aluguel pedido por m²';
+    if (activeMetric === 'currentRent') return 'total mensal anunciado';
+    return activeMetric === 'rent2026' ? 'aluguel mensal pedido' : 'preço total pedido';
+  }
+
+  function formattedValue(value) {
+    return `${money.format(value)}${activeValue === 'price_m2' ? '/m²' : activeMetric.startsWith('sale') ? '' : '/mês'}`;
+  }
+
+  function priceNote() {
+    return activeValue === 'total'
+      ? activeMetric === 'currentRent' ? 'Aluguel + condomínio + IPTU informados.'
+        : activeMetric === 'rent2026' ? 'Aluguel mensal pedido, sem taxas.'
+          : 'Preço pedido pelo imóvel.'
+      : activeMetric === 'currentRent' ? 'Aluguel pedido ÷ área, sem taxas.'
+        : activeMetric === 'rent2026' ? 'Aluguel pedido ÷ área.'
+          : 'Preço pedido ÷ área.';
+  }
+
+  function listingPopup(item, fallback) {
+    const selectedPrice = formattedValue(valueOf(item));
+    const total = activeMetric === 'currentRent' && Number.isFinite(item.total_price)
+      ? `<br>Total mensal anunciado: ${money.format(item.total_price)}` : '';
+    return `<strong>${escapeHtml(item.address || fallback)}</strong><br>${escapeHtml(valueLabel())}: <strong>${selectedPrice}</strong><br>Valor pedido: ${money.format(item.price)}${total}${item.area ? `<br>${number.format(item.area)} m²` : ''}<br><small>Localização informada na base; pode ser aproximada.</small>`;
+  }
+
   function pointSet() {
     const source = activeMetric === 'currentRent' ? classifiedCurrent : classifiedHistorical;
-    return source.filter(metrics[activeMetric].select);
+    return source.filter(item => metrics[activeMetric].select(item)
+      && Number.isFinite(valueOf(item)) && valueOf(item) > 0);
   }
 
   function sourcePointSet() {
@@ -160,7 +193,7 @@ export async function createMosaic(historical, current) {
     const legend = L.control({position:'bottomright'});
     legend.onAdd = () => {
       const div = L.DomUtil.create('div', 'legend mosaic-legend');
-      div.innerHTML = `<strong>${escapeHtml(label)} · preço pedido/m²</strong><div class="bar-price"></div><span>Menor preço</span><span>Até ${money.format(cap)}/m²</span><small>Cinza: menos de ${threshold} anúncios</small>`;
+      div.innerHTML = `<strong>${escapeHtml(label)} · ${escapeHtml(valueLabel())}</strong><div class="bar-price"></div><span>Menor valor</span><span>Até ${formattedValue(cap)}</span><small>Cinza: menos de ${threshold} anúncios · cores limitadas no P95</small>`;
       return div;
     };
     legend.addTo(map);
@@ -171,7 +204,7 @@ export async function createMosaic(historical, current) {
     const legend = L.control({position:'bottomright'});
     legend.onAdd = () => {
       const div = L.DomUtil.create('div', 'legend mosaic-legend');
-      div.innerHTML = `<strong>${escapeHtml(metrics[activeMetric].label)} · escala deste bairro</strong><div class="bar-price"></div><span>${low === null ? 'Sem regiões com amostra' : `${money.format(low)}/m²`}</span><span>${high === null ? '' : `${money.format(high)}/m²`}</span><small>Cinza: menos de 3 anúncios · preços pedidos</small>`;
+      div.innerHTML = `<strong>${escapeHtml(metrics[activeMetric].label)} · ${escapeHtml(valueLabel())}</strong><div class="bar-price"></div><span>${low === null ? 'Sem regiões com amostra' : formattedValue(low)}</span><span>${high === null ? '' : formattedValue(high)}</span><small>Escala deste bairro · cinza: menos de 3 anúncios</small>`;
       return div;
     };
     legend.addTo(map);
@@ -185,25 +218,33 @@ export async function createMosaic(historical, current) {
   function updateHeader(title, subtitle) {
     document.getElementById('mosaicAreaTitle').textContent = title;
     document.getElementById('mosaicAreaSubtitle').textContent = subtitle;
-    const back = document.getElementById('mosaicBack');
-    back.hidden = !selectedCity;
-    back.textContent = selected ? `← Ver bairros de ${selectedCity.properties.name}` : '← Ver cidades da região metropolitana';
+    const cityCrumb = document.getElementById('mosaicCityCrumb');
+    cityCrumb.hidden = !selectedCity;
+    cityCrumb.textContent = selectedCity?.properties.name || '';
+    document.getElementById('mosaicCrumbSeparator').hidden = !selectedCity;
+    const neighborhoodCrumb = document.getElementById('mosaicNeighborhoodCrumb');
+    neighborhoodCrumb.hidden = !selected;
+    neighborhoodCrumb.textContent = selected ? `› ${selected.properties.name}` : '';
+    document.getElementById('mosaicMetroCrumb').disabled = !selectedCity;
+    cityCrumb.disabled = !selected;
+    document.getElementById('mosaicValueSummary').textContent = `Mediana do ${valueLabel()} · ${priceNote()}`;
     citySelect.value = selectedCity ? String(selectedCity.properties.code) : '';
     populateNeighborhoodSelect();
     const hasNeighborhoods = selectedCity && neighborhoodsByCity.has(String(selectedCity.properties.code));
     document.getElementById('mosaicNeighborhoodWrap').hidden = !hasNeighborhoods;
-    document.getElementById('mapSourceLabel').textContent = `MOSAICO RMBH · ${metrics[activeMetric].label.toUpperCase()}`;
+    document.getElementById('mosaicControls').classList.toggle('has-neighborhoods', Boolean(hasNeighborhoods));
+    document.getElementById('mapSourceLabel').textContent = `MOSAICO RMBH · ${metrics[activeMetric].label.toUpperCase()} · ${activeValue === 'price_m2' ? 'POR M²' : 'TOTAL'}`;
     document.getElementById('mapAreaLabel').textContent = selected ? selected.properties.name
       : selectedCity ? selectedCity.properties.name : 'Clique numa cidade para ver suas regiões';
     document.getElementById('mapInteractionHint').textContent = selected
       ? 'Clique numa região · ative os pontos dos anúncios abaixo do mapa'
       : hasNeighborhoods
-        ? 'Clique num bairro para ver suas regiões · use a seta para voltar'
+        ? 'Clique num bairro para ver suas regiões · use o caminho acima para voltar'
         : selectedCity
-          ? 'Clique numa região ou ponto para ver os preços · use a seta para voltar'
-          : 'Clique numa cidade · escolha o período acima · explore as regiões';
+          ? 'Clique numa região ou ponto para ver os preços · use o caminho acima para voltar'
+          : 'Clique numa cidade para explorar · alterne o valor exibido acima';
     document.getElementById('mapCaption').textContent = selected
-      ? `${selectedCity.properties.name === 'Nova Lima' ? 'Limites propostos pela prefeitura, ainda não validados. ' : ''}Células de 400 m com escala de cores própria do bairro e ruas visíveis sob a camada. Preços pedidos, não valores de transação.`
+      ? `${selectedCity.properties.name === 'Nova Lima' ? 'Limites propostos pela prefeitura, ainda não validados. ' : ''}Células de 400 m com escala de cores própria do bairro e ruas visíveis sob a camada. ${priceNote()} Preços pedidos, não valores de transação.`
       : hasNeighborhoods
         ? String(selectedCity.properties.code) === bhCode
           ? 'Bairros: PBH/Prodabel, Bairro Popular 2024. Clique num bairro para ver as regiões de 400 m.'
@@ -214,7 +255,7 @@ export async function createMosaic(historical, current) {
               : 'Bairros: Prefeitura de Betim, mapa de março de 2026. Clique num bairro para ver regiões de 400 m.'
         : selectedCity
           ? 'Grade de 1 km recortada pelo município. Regiões cinzas têm menos de 3 anúncios localizados.'
-          : 'Municípios: Fundação João Pinheiro/PBH, RMBH 2026. Cor = mediana do preço pedido por m²; cinza = amostra pequena.';
+          : `Municípios: Fundação João Pinheiro/PBH, RMBH 2026. Cor = mediana do ${valueLabel()}; cinza = amostra pequena. ${priceNote()}`;
   }
 
   function drawMetro() {
@@ -227,17 +268,17 @@ export async function createMosaic(historical, current) {
       if (!groups.has(p.mosaicCityCode)) groups.set(p.mosaicCityCode, []);
       groups.get(p.mosaicCityCode).push(p);
     });
-    const cap = percentile(activePoints.map(p => p.price_m2), .95) || 1;
+    const cap = percentile(activePoints.map(valueOf), .95) || 1;
     const layer = L.geoJSON({type:'FeatureCollection', features:cities}, {
       style: feature => {
         const items = groups.get(String(feature.properties.code)) || [];
-        const value = items.length >= 5 ? median(items.map(p => p.price_m2)) : null;
+        const value = items.length >= 5 ? median(items.map(valueOf)) : null;
         return {color:'#f8fbf6', weight:1.4, fillColor:value ? color(value, cap) : '#91a5a0', fillOpacity:value ? .78 : .72};
       },
       onEachFeature: (feature, polygon) => {
         const items = groups.get(String(feature.properties.code)) || [];
-        const value = items.length >= 5 ? median(items.map(p => p.price_m2)) : null;
-        polygon.bindTooltip(`<strong>${escapeHtml(feature.properties.name)}</strong><br>${value ? `${money.format(value)}/m²` : 'Amostra insuficiente'} · ${number.format(items.length)} anúncios`, {sticky:true});
+        const value = items.length >= 5 ? median(items.map(valueOf)) : null;
+        polygon.bindTooltip(`<strong>${escapeHtml(feature.properties.name)}</strong><br>${value ? formattedValue(value) : 'Amostra insuficiente'} · ${number.format(items.length)} anúncios`, {sticky:true});
         polygon.on('mouseover', () => polygon.setStyle({weight:2.5, color:'#173432', fillOpacity:.9}));
         polygon.on('mouseout', () => layer.resetStyle(polygon));
         polygon.on('click', () => openCity(String(feature.properties.code)));
@@ -247,11 +288,11 @@ export async function createMosaic(historical, current) {
     addLegend(metrics[activeMetric].label, 5, cap);
     map.fitBounds(metroBounds.pad(.025), {animate:false});
     const sourcePoints = sourcePointSet();
-    const withCoordinates = sourcePoints.filter(p => Number.isFinite(p.price_m2) && p.price_m2 > 0
+    const withCoordinates = sourcePoints.filter(p => Number.isFinite(valueOf(p)) && valueOf(p) > 0
       && Number.isFinite(p.lat) && Number.isFinite(p.lon)).length;
     const outside = withCoordinates - activePoints.length;
     const withoutCoordinates = sourcePoints.length - withCoordinates;
-    updateHeader('Região Metropolitana de Belo Horizonte', `${number.format(cities.length)} cidades · ${number.format(activePoints.length)} anúncios na malha${outside ? ` · ${number.format(outside)} fora da malha` : ''}${withoutCoordinates ? ` · ${number.format(withoutCoordinates)} sem localização ou preço/m² válido` : ''}`);
+    updateHeader('Região Metropolitana de Belo Horizonte', `${number.format(cities.length)} cidades · ${number.format(activePoints.length)} anúncios na malha${outside ? ` · ${number.format(outside)} fora da malha` : ''}${withoutCoordinates ? ` · ${number.format(withoutCoordinates)} sem localização ou valor válido` : ''}`);
     document.getElementById('mosaicDetail').hidden = true;
   }
 
@@ -267,17 +308,17 @@ export async function createMosaic(historical, current) {
       if (!groups.has(p.mosaicCode)) groups.set(p.mosaicCode, []);
       groups.get(p.mosaicCode).push(p);
     });
-    const cap = percentile(zoned.map(p => p.price_m2), .95) || 1;
+    const cap = percentile(zoned.map(valueOf), .95) || 1;
     const layer = L.geoJSON({type:'FeatureCollection', features:cityNeighborhoods}, {
       style: feature => {
         const points = groups.get(String(feature.properties.code)) || [];
-        const value = points.length >= 5 ? median(points.map(p => p.price_m2)) : null;
+        const value = points.length >= 5 ? median(points.map(valueOf)) : null;
         return {color:'#f8fbf6', weight:1, fillColor:value ? color(value, cap) : '#91a5a0', fillOpacity:value ? .78 : .72};
       },
       onEachFeature: (feature, polygon) => {
         const points = groups.get(String(feature.properties.code)) || [];
-        const value = points.length >= 5 ? median(points.map(p => p.price_m2)) : null;
-        polygon.bindTooltip(`<strong>${escapeHtml(feature.properties.name)}</strong><br>${value ? `${money.format(value)}/m²` : 'Amostra insuficiente'} · ${number.format(points.length)} anúncios`, {sticky:true});
+        const value = points.length >= 5 ? median(points.map(valueOf)) : null;
+        polygon.bindTooltip(`<strong>${escapeHtml(feature.properties.name)}</strong><br>${value ? formattedValue(value) : 'Amostra insuficiente'} · ${number.format(points.length)} anúncios`, {sticky:true});
         polygon.on('mouseover', () => polygon.setStyle({weight:2, color:'#173432', fillOpacity:.9}));
         polygon.on('mouseout', () => layer.resetStyle(polygon));
         polygon.on('click', () => openNeighborhood(String(feature.properties.code)));
@@ -336,21 +377,21 @@ export async function createMosaic(historical, current) {
       if (!groups.has(id)) groups.set(id, []);
       groups.get(id).push(p);
     });
-    const cap = percentile(pointSet().map(p => p.price_m2), .95) || 1;
+    const cap = percentile(pointSet().map(valueOf), .95) || 1;
     const outline = L.geoJSON(selectedCity, {style:{color:'#173432', weight:2.5, fillOpacity:0}, interactive:false}).addTo(map);
     currentLayers.push(outline);
     const layer = L.geoJSON({type:'FeatureCollection', features:cellFeatures}, {
       style: feature => {
         const items = groups.get(feature.properties.id) || [];
-        const value = items.length >= 3 ? median(items.map(p => p.price_m2)) : null;
+        const value = items.length >= 3 ? median(items.map(valueOf)) : null;
         return {color:value ? '#5e6d63' : '#9ba9a0', weight:.8, fillColor:value ? color(value, cap) : '#d0d9d1', fillOpacity:value ? .38 : .09};
       },
       onEachFeature: (feature, polygon) => {
         const items = groups.get(feature.properties.id) || [];
-        const value = items.length >= 3 ? median(items.map(p => p.price_m2)) : null;
-        const label = value ? `${money.format(value)}/m²` : 'Amostra insuficiente';
+        const value = items.length >= 3 ? median(items.map(valueOf)) : null;
+        const label = value ? formattedValue(value) : 'Amostra insuficiente';
         polygon.bindTooltip(`<strong>${escapeHtml(selectedCity.properties.name)}</strong><br>Região de 1 km · ${label}<br>${items.length} anúncios com localização`, {sticky:true});
-        polygon.bindPopup(`<strong>Região de ${escapeHtml(selectedCity.properties.name)}</strong><br>Preço pedido/m²: ${label}<br>${items.length} anúncios localizados${items.length < 3 ? '<br><small>São necessários 3 anúncios para colorir esta região.</small>' : ''}`);
+        polygon.bindPopup(`<strong>Região de ${escapeHtml(selectedCity.properties.name)}</strong><br>${escapeHtml(valueLabel())}: ${label}<br>${items.length} anúncios localizados${items.length < 3 ? '<br><small>São necessários 3 anúncios para colorir esta região.</small>' : ''}`);
         polygon.on('mouseover', () => polygon.setStyle({weight:2.4, color:'#173432'}));
         polygon.on('mouseout', () => layer.resetStyle(polygon));
       }
@@ -360,19 +401,19 @@ export async function createMosaic(historical, current) {
     const dots = L.layerGroup();
     precise.forEach(p => {
       const marker = L.circleMarker([p.lat, p.lon], {radius:3.5, color:'#173432', weight:1, fillColor:'#fff', fillOpacity:.95});
-      marker.bindPopup(`<strong>${escapeHtml(p.address || selectedCity.properties.name)}</strong><br>${money.format(p.price_m2)}/m² · ${money.format(p.price)}${p.area ? `<br>${number.format(p.area)} m²` : ''}<br><small>Localização informada na base; pode ser aproximada.</small>`);
+      marker.bindPopup(listingPopup(p, selectedCity.properties.name));
       marker.addTo(dots);
     });
     dots.addTo(map);
     currentLayers.push(dots);
     addLegend(metrics[activeMetric].label, 3, cap);
     map.fitBounds(outline.getBounds().pad(.08), {animate:false, maxZoom:13});
-    const value = points.length >= 5 ? median(points.map(p => p.price_m2)) : null;
+    const value = points.length >= 5 ? median(points.map(valueOf)) : null;
     const colored = [...groups.values()].filter(items => items.length >= 3).length;
     updateHeader(selectedCity.properties.name, `${metrics[activeMetric].description} · ${number.format(points.length)} anúncios associados à cidade`);
     const detail = document.getElementById('mosaicDetail');
     detail.hidden = false;
-    detail.innerHTML = `<div class="mosaic-detail-heading"><span>INTERIOR DA CIDADE</span><h2>${escapeHtml(selectedCity.properties.name)}</h2><p>Grade de 1 km recortada pelo limite municipal. Clique numa região ou num ponto para ver os valores.</p></div><div class="mosaic-detail-stats"><div><strong>${value ? `${money.format(value)}/m²` : 'sem mediana'}</strong><span>Mediana da cidade · mínimo de 5 anúncios</span></div><div><strong>${number.format(assignedToCells)}</strong><span>Anúncios localizados na grade interna</span></div><div><strong>${number.format(colored)}</strong><span>Regiões com pelo menos 3 anúncios</span></div></div><p class="mosaic-detail-note">${points.length - precise.length ? `${number.format(points.length - precise.length)} anúncio(s) com posição aproximada entram no total, mas não na grade interna. ` : ''}${precise.length - assignedToCells ? `${number.format(precise.length - assignedToCells)} anúncio(s) ficam no total da cidade, mas fora das células da grade. ` : ''}Cinza indica amostra pequena. A grade é geométrica e não representa limites oficiais de bairros. A atribuição dos imóveis usa suas coordenadas e pode divergir da cidade escrita no anúncio.</p>`;
+    detail.innerHTML = `<div class="mosaic-detail-heading"><span>INTERIOR DA CIDADE</span><h2>${escapeHtml(selectedCity.properties.name)}</h2><p>Grade de 1 km recortada pelo limite municipal. Clique numa região ou num ponto para ver os valores.</p></div><div class="mosaic-detail-stats"><div><strong>${value ? formattedValue(value) : 'sem mediana'}</strong><span>Mediana do ${escapeHtml(valueLabel())} na cidade · mínimo de 5 anúncios</span></div><div><strong>${number.format(assignedToCells)}</strong><span>Anúncios localizados na grade interna</span></div><div><strong>${number.format(colored)}</strong><span>Regiões com pelo menos 3 anúncios</span></div></div><p class="mosaic-detail-note">${points.length - precise.length ? `${number.format(points.length - precise.length)} anúncio(s) com posição aproximada entram no total, mas não na grade interna. ` : ''}${precise.length - assignedToCells ? `${number.format(precise.length - assignedToCells)} anúncio(s) ficam no total da cidade, mas fora das células da grade. ` : ''}Cinza indica amostra pequena. A grade é geométrica e não representa limites oficiais de bairros. A atribuição dos imóveis usa suas coordenadas e pode divergir da cidade escrita no anúncio. ${priceNote()}</p>`;
   }
 
   async function loadCells() {
@@ -429,7 +470,7 @@ export async function createMosaic(historical, current) {
     });
     const pricedRegions = cellFeatures.map(feature => {
       const items = groups.get(feature.properties.id) || [];
-      return {feature, count:items.length, price:items.length >= 3 ? median(items.map(p => p.price_m2)) : null};
+      return {feature, count:items.length, price:items.length >= 3 ? median(items.map(valueOf)) : null};
     }).filter(region => region.price !== null).sort((a,b) => b.price - a.price || b.count - a.count);
     const prices = pricedRegions.map(region => region.price);
     const low = prices.length ? Math.min(...prices) : null;
@@ -442,16 +483,16 @@ export async function createMosaic(historical, current) {
     const layer = L.geoJSON({type:'FeatureCollection', features:cellFeatures}, {
       style: feature => {
         const items = groups.get(feature.properties.id) || [];
-        const value = items.length >= 3 ? median(items.map(p => p.price_m2)) : null;
+        const value = items.length >= 3 ? median(items.map(valueOf)) : null;
         return {color:value ? '#506259' : '#98aaa0', weight:.9, fillColor:value ? neighborhoodColor(value) : '#d4ddd5', fillOpacity:value ? .43 : .08};
       },
       onEachFeature: (feature, polygon) => {
         polygons.set(feature.properties.id, polygon);
         const items = groups.get(feature.properties.id) || [];
-        const value = items.length >= 3 ? median(items.map(p => p.price_m2)) : null;
-        const label = value ? `${money.format(value)}/m²` : 'Amostra insuficiente';
+        const value = items.length >= 3 ? median(items.map(valueOf)) : null;
+        const label = value ? formattedValue(value) : 'Amostra insuficiente';
         polygon.bindTooltip(`<strong>${escapeHtml(selected.properties.name)}</strong><br>Região de 400 m · ${label}<br>${items.length} anúncios com localização`, {sticky:true});
-        polygon.bindPopup(`<strong>Região de ${escapeHtml(selected.properties.name)}</strong><br>Preço pedido/m²: ${label}<br>${items.length} anúncios localizados${items.length < 3 ? '<br><small>São necessários 3 anúncios para colorir esta região.</small>' : ''}`);
+        polygon.bindPopup(`<strong>Região de ${escapeHtml(selected.properties.name)}</strong><br>${escapeHtml(valueLabel())}: ${label}<br>${items.length} anúncios localizados${items.length < 3 ? '<br><small>São necessários 3 anúncios para colorir esta região.</small>' : ''}`);
         polygon.on('mouseover', () => polygon.setStyle({weight:2.5, color:'#173432'}));
         polygon.on('mouseout', () => layer.resetStyle(polygon));
       }
@@ -461,7 +502,7 @@ export async function createMosaic(historical, current) {
     const dots = L.layerGroup();
     precise.forEach(p => {
       const marker = L.circleMarker([p.lat, p.lon], {radius:3, color:'#173432', weight:1, fillColor:'#fff', fillOpacity:.9});
-      marker.bindPopup(`<strong>${escapeHtml(p.address || selected.properties.name)}</strong><br>${money.format(p.price_m2)}/m² · ${money.format(p.price)}${p.area ? `<br>${number.format(p.area)} m²` : ''}<br><small>Localização informada na base; pode ser aproximada.</small>`);
+      marker.bindPopup(listingPopup(p, selected.properties.name));
       marker.addTo(dots);
     });
     if (showPoints) dots.addTo(map);
@@ -479,19 +520,19 @@ export async function createMosaic(historical, current) {
     currentLayers.push(badges);
     addNeighborhoodLegend(low, high);
     map.fitBounds(outline.getBounds().pad(.14), {animate:false, maxZoom:15});
-    const value = points.length >= 5 ? median(points.map(p => p.price_m2)) : null;
+    const value = points.length >= 5 ? median(points.map(valueOf)) : null;
     const colored = pricedRegions.length;
     updateHeader(selected.properties.name, `${selectedCity.properties.name === 'Nova Lima' ? 'limites propostos, ainda não validados · ' : ''}${metrics[activeMetric].description} · ${number.format(points.length)} anúncios associados ao bairro`);
     const detail = document.getElementById('mosaicDetail');
     detail.hidden = false;
-    const topRegions = pricedRegions.slice(0, 3).map((region, index) => `<button type="button" data-mosaic-cell="${escapeHtml(region.feature.properties.id)}"><b>${index + 1}ª região</b><strong>${money.format(region.price)}/m²</strong><small>${number.format(region.count)} anúncios · aproximar ruas ↗</small></button>`).join('');
+    const topRegions = pricedRegions.slice(0, 3).map((region, index) => `<button type="button" data-mosaic-cell="${escapeHtml(region.feature.properties.id)}"><b>${index + 1}ª região</b><strong>${formattedValue(region.price)}</strong><small>${number.format(region.count)} anúncios · aproximar ruas ↗</small></button>`).join('');
     const intro = colored ? 'As cores comparam as regiões deste bairro. As ruas continuam visíveis sob a camada translúcida; clique numa região ou aproxime pelo ranking.'
       : 'Ainda não há anúncios suficientes para comparar as regiões deste bairro. As ruas e seus limites continuam visíveis.';
     const sourceNote = cityCode === bhCode ? 'PBH/Prodabel'
       : cityCode === '32' ? 'Prefeitura de Contagem (bairros e loteamentos, inclusive áreas não aprovadas)'
         : cityCode === '27' ? 'Prefeitura de Nova Lima (proposta ainda não validada)'
           : 'Prefeitura de Betim';
-    detail.innerHTML = `<div class="mosaic-detail-heading"><span>INTERIOR DO BAIRRO</span><h2>${escapeHtml(selected.properties.name)}</h2><p>${intro}</p></div><label class="mosaic-point-toggle"><input id="mosaicShowPoints" type="checkbox" ${showPoints ? 'checked' : ''}> Mostrar pontos dos anúncios</label><div class="mosaic-detail-stats"><div><strong>${value ? `${money.format(value)}/m²` : 'sem mediana'}</strong><span>Mediana do bairro · mínimo de 5 anúncios</span></div><div><strong>${number.format(assignedToCells)}</strong><span>Anúncios localizados na grade interna</span></div><div><strong>${number.format(colored)}</strong><span>Regiões com pelo menos 3 anúncios</span></div></div><div class="mosaic-top-regions"><h3>Regiões mais caras neste bairro</h3><p>Mediana do preço pedido em células de 400 m com pelo menos 3 anúncios.</p><div>${topRegions || '<span class="mosaic-empty">Ainda não há regiões com amostra suficiente.</span>'}</div></div><p class="mosaic-detail-note">${points.length - precise.length ? `${number.format(points.length - precise.length)} anúncio(s) com posição aproximada pelo bairro entram no total, mas não nas regiões internas. ` : ''}${precise.length - assignedToCells ? `${number.format(precise.length - assignedToCells)} anúncio(s) ficam no total do bairro, mas fora das células da grade. ` : ''}Cinza indica amostra pequena. Os limites são da ${sourceNote}; a atribuição dos imóveis usa suas coordenadas e pode divergir do bairro escrito no anúncio.</p>`;
+    detail.innerHTML = `<div class="mosaic-detail-heading"><span>INTERIOR DO BAIRRO</span><h2>${escapeHtml(selected.properties.name)}</h2><p>${intro}</p></div><label class="mosaic-point-toggle"><input id="mosaicShowPoints" type="checkbox" ${showPoints ? 'checked' : ''}> Mostrar pontos dos anúncios</label><div class="mosaic-detail-stats"><div><strong>${value ? formattedValue(value) : 'sem mediana'}</strong><span>Mediana do ${escapeHtml(valueLabel())} no bairro · mínimo de 5 anúncios</span></div><div><strong>${number.format(assignedToCells)}</strong><span>Anúncios localizados na grade interna</span></div><div><strong>${number.format(colored)}</strong><span>Regiões com pelo menos 3 anúncios</span></div></div><div class="mosaic-top-regions"><h3>Regiões mais caras neste bairro</h3><p>Mediana do ${escapeHtml(valueLabel())} em células de 400 m com pelo menos 3 anúncios.</p><div>${topRegions || '<span class="mosaic-empty">Ainda não há regiões com amostra suficiente.</span>'}</div></div><p class="mosaic-detail-note">${points.length - precise.length ? `${number.format(points.length - precise.length)} anúncio(s) com posição aproximada pelo bairro entram no total, mas não nas regiões internas. ` : ''}${precise.length - assignedToCells ? `${number.format(precise.length - assignedToCells)} anúncio(s) ficam no total do bairro, mas fora das células da grade. ` : ''}Cinza indica amostra pequena. Os limites são da ${sourceNote}; a atribuição dos imóveis usa suas coordenadas e pode divergir do bairro escrito no anúncio. ${priceNote()}</p>`;
     detail.querySelector('#mosaicShowPoints').addEventListener('change', event => {
       showPoints = event.target.checked;
       if (showPoints) dots.addTo(map);
@@ -513,12 +554,11 @@ export async function createMosaic(historical, current) {
 
   document.getElementById('mosaicMetric').addEventListener('change', event => {
     activeMetric = event.target.value;
-    if (!active) return;
-    if (selected) (String(selectedCity.properties.code) === bhCode ? bhCells : metroNeighborhoodCells)
-      ? drawNeighborhood() : openNeighborhood(String(selected.properties.code));
-    else if (selectedCity) neighborhoodsByCity.has(String(selectedCity.properties.code)) ? drawCity()
-      : metroCells ? drawMunicipality() : openCity(String(selectedCity.properties.code));
-    else drawMetro();
+    if (active) showSelected();
+  });
+  document.getElementById('mosaicValue').addEventListener('change', event => {
+    activeValue = event.target.value;
+    if (active) showSelected();
   });
   citySelect.addEventListener('change', event => {
     if (event.target.value) openCity(event.target.value);
@@ -528,7 +568,8 @@ export async function createMosaic(historical, current) {
     if (event.target.value) openNeighborhood(event.target.value);
     else backToCity();
   });
-  document.getElementById('mosaicBack').addEventListener('click', () => selected ? backToCity() : backToMetro());
+  document.getElementById('mosaicMetroCrumb').addEventListener('click', backToMetro);
+  document.getElementById('mosaicCityCrumb').addEventListener('click', backToCity);
 
   function backToCity() {
     ++sequence;

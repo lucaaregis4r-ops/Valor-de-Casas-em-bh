@@ -4,7 +4,7 @@ import { norm, selectedFilters, baseFilter, groupByNeighborhood, neighborhoodMed
 import { loadPublicData, currentListings, neighborhoodDaily, listingEvents, publicMeta } from './public-data.js';
 import { neighborhoodNames, neighborhoodSlug, profileLink, renderDirectory, renderProfile, renderComparison } from './neighborhoods.js';
 import { createDailyMarket } from './daily-market.js?v=20261010g';
-import { createMosaic } from './mosaic.js';
+import { createMosaic } from './mosaic.js?v=20261010i';
 
 let allPoints = [];
 let allCities = [];
@@ -794,6 +794,7 @@ function navigate() {
   if (explore) {
     const home = currentView === 'map';
     const daily = currentView === 'agora';
+    document.querySelector('.map-controls').classList.toggle('mosaic-mode', home);
     viewFamily = daily ? 'daily' : 'historical';
     document.getElementById('homeChoices').hidden = !home;
     document.getElementById('mosaicControls').hidden = !home;
@@ -812,7 +813,7 @@ function navigate() {
     document.getElementById('viewTitle').textContent = daily ? 'Mercado Agora' : home ? 'O custo de morar, no mapa.' : 'Atlas do morar';
     document.getElementById('viewIntro').textContent = daily
       ? 'Acompanhe os anúncios de aluguel observados nas coletas, a oferta e seus movimentos recentes.'
-      : home ? 'Clique em uma cidade para abrir seu mapa e ver os preços pedidos em cada região. BH, Contagem, Betim e Nova Lima também têm divisão por bairros e áreas. Escolha venda ou aluguel para comparar leituras diferentes.'
+      : home ? 'Escolha venda ou aluguel, compare o preço por m² ou o valor total e abra uma cidade. Em BH, Contagem, Betim e Nova Lima, você também pode entrar em um bairro para ver suas regiões.'
         : 'Compare os preços pedidos de venda de 2021 e 2026, bairro a bairro.';
     document.getElementById('analysisEyebrow').textContent = daily ? 'OFERTA OBSERVADA' : 'LEITURA HISTÓRICA';
     document.getElementById('analysisTitle').textContent = daily ? 'Resumo da coleta selecionada' : 'Panorama da área selecionada';
