@@ -2,12 +2,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any, Mapping
 
 from .ingest import PreparedCollection
 
 
 class CollectionValidationError(RuntimeError):
     """Raised when a source batch is unsafe to add to the daily history."""
+
+
+def eligible_page_attempts(metrics: Mapping[str, Any]) -> int:
+    """Exclude only pages whose source confirmed the listing was unavailable."""
+    attempted = int(metrics.get("pages_attempted", 0) or 0)
+    not_found = int(metrics.get("pages_not_found", 0) or 0)
+    unavailable = int(metrics.get("pages_unavailable", 0) or 0)
+    return max(0, attempted - not_found - unavailable)
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,10 +81,8 @@ def validate_prepared_collection(
             f"(limite {policy.max_invalid_fraction:.0%}). Exemplos: {samples}"
         )
 
-    attempted = int(prepared.metrics.get("pages_attempted", 0) or 0)
-    not_found = int(prepared.metrics.get("pages_not_found", 0) or 0)
     page_failures = int(prepared.metrics.get("pages_failed", 0) or 0)
-    fetchable_attempts = max(0, attempted - not_found)
+    fetchable_attempts = eligible_page_attempts(prepared.metrics)
     if fetchable_attempts:
         failure_fraction = page_failures / fetchable_attempts
         if failure_fraction > policy.max_page_failure_fraction:
@@ -89,7 +96,7 @@ def validate_prepared_collection(
         parse_fraction = int(parsed) / successful_pages
         if parse_fraction < policy.min_parse_success_fraction:
             raise CollectionValidationError(
-                f"apenas {parse_fraction:.1%} das páginas tentadas geraram anúncio normalizado; "
+                f"apenas {parse_fraction:.1%} das páginas elegíveis geraram anúncio legível; "
                 f"mínimo: {policy.min_parse_success_fraction:.1%}"
             )
 

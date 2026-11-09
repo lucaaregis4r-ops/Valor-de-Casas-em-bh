@@ -121,8 +121,10 @@ def xml_locs(xml_text):
 
 
 def looks_like_rm_bh(url):
-    low = url.lower()
-    return any(slug in low for slug in RMBH_SLUGS)
+    # The public listing slug ends with the municipality. A match elsewhere
+    # can be a neighborhood with the same name in another state.
+    listing_slug = urlparse(url).path.rstrip("/").rsplit("/", 1)[-1].lower()
+    return any(listing_slug.endswith(f"-{city}") for city in RMBH_SLUGS)
 
 
 def normalize_text(value):

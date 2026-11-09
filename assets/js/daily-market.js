@@ -6,6 +6,10 @@ import { profileLink } from './neighborhoods.js';
 
 const fmtBRL = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL', maximumFractionDigits:0});
 const fmtNum = new Intl.NumberFormat('pt-BR');
+const fmtReadRate = new Intl.NumberFormat('pt-BR', {style:'percent', maximumFractionDigits:1});
+const fmtCollectionTime = new Intl.DateTimeFormat('pt-BR', {
+  dateStyle:'short', timeStyle:'short', timeZone:'America/Sao_Paulo'
+});
 
 export function createDailyMarket({deltaColor, colorForRatio, pct}) {
 function escapeHtml(value) {
@@ -32,13 +36,22 @@ function localDateLabel(value) {
   const date = new Date(`${value.slice(0, 10)}T12:00:00`);
   return Number.isNaN(date.valueOf()) ? escapeHtml(value) : date.toLocaleDateString('pt-BR');
 }
+function collectionTimeLabel(value) {
+  const date = new Date(value ?? NaN);
+  return Number.isNaN(date.valueOf()) ? null : fmtCollectionTime.format(date);
+}
 function renderCollectionStatus() {
   const banner = document.getElementById('collectionStatus');
   const health = publicMeta?.health?.status || 'unknown';
-  const lastSuccess = publicMeta?.last_successful_update
-    ? new Date(publicMeta.last_successful_update).toLocaleString('pt-BR')
-    : null;
+  const lastSuccess = collectionTimeLabel(publicMeta?.last_successful_update);
   const failedSource = publicMeta?.sources?.find(source => source.status === 'failed');
+  const lastAttempt = collectionTimeLabel(failedSource?.last_run_at);
+  const readRate = failedSource?.metrics?.page_parse_success_fraction;
+  const failureDetails = [
+    lastSuccess ? `Dados exibidos da coleta de ${lastSuccess}.` : 'Ainda não há uma coleta válida.',
+    lastAttempt ? `Tentativa mais recente em ${lastAttempt}.` : '',
+    Number.isFinite(readRate) ? `Leitura de ${fmtReadRate.format(readRate)} das páginas elegíveis.` : ''
+  ].filter(Boolean).join(' ');
   const presentations = {
     healthy: ['success', 'Dados atualizados', lastSuccess ? `Última coleta válida em ${lastSuccess}.` : 'A coleta diária está saudável.'],
     success: ['success', 'Dados atualizados', lastSuccess ? `Última coleta válida em ${lastSuccess}.` : 'A coleta diária está saudável.'],
@@ -47,9 +60,7 @@ function renderCollectionStatus() {
     failed: [
       'failed',
       lastSuccess ? 'Última coleta não concluída' : 'Primeira coleta não concluída',
-      failedSource?.failure_type
-        ? `A base publicada foi preservada. Falha: ${failedSource.failure_type}.`
-        : 'A base publicada foi preservada e a fonte requer atenção.'
+      failureDetails
     ],
     unknown: ['degraded', 'Aguardando dados diários', 'O histórico de 2021 e 2026 continua disponível.']
   };
@@ -260,8 +271,7 @@ function dailySummary(rows, selectedDate, metric, currentContext=null) {
     ? currentListings.filter(item => item.available && matchesDailyArea(item, currentDailyFilters()))
       .map(item => item.price).filter(Number.isFinite)
     : [];
-  const lastSuccess = publicMeta?.last_successful_update
-    ? new Date(publicMeta.last_successful_update).toLocaleString('pt-BR') : 'sem coleta válida';
+  const lastSuccess = collectionTimeLabel(publicMeta?.last_successful_update) || 'sem coleta válida';
   const sourceHealth = publicMeta?.health?.sources || {};
   const sourceHealthText = publicMeta?.sources?.length
     ? `${sourceHealth.healthy || 0} saudáveis · ${sourceHealth.degraded || 0} atenção · ${sourceHealth.failed || 0} falhas · ${sourceHealth.running || 0} em execução`
@@ -400,8 +410,7 @@ function drawDaily() {
     plotted = drawDailyNeighborhoods(rows, metric);
   }
   dailySummary(rows, selectedDate, metric, currentContext);
-  const lastSuccess = publicMeta?.last_successful_update
-    ? new Date(publicMeta.last_successful_update).toLocaleString('pt-BR') : 'sem coleta válida';
+  const lastSuccess = collectionTimeLabel(publicMeta?.last_successful_update) || 'sem coleta válida';
   const collectionFailed = publicMeta?.health?.status === 'failed';
   document.getElementById('note').textContent = rows.length
     ? currentView

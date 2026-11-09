@@ -30,6 +30,46 @@ def fixture_fetch(url):
 
 
 class QuintoAndarCollectorTests(unittest.TestCase):
+    def test_ignores_sitemap_entries_named_after_rmbh_cities_outside_the_region(self):
+        outside = (
+            "https://www.quintoandar.com.br/imovel/895505063/alugar/"
+            "apartamento-2-quartos-jardim-sabara-porto-alegre"
+        )
+
+        def fetch(url):
+            if url.endswith("sitemap-v2-listings-part-1.xml"):
+                return f"<urlset><url><loc>{LISTING_URL}</loc></url><url><loc>{outside}</loc></url></urlset>"
+            return fixture_fetch(url)
+
+        collector = QuintoAndarCollector(delay_seconds=0, fetch_text=fetch)
+        with redirect_stdout(StringIO()):
+            records = collector.collect()
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(collector.metrics["candidate_pages"], 1)
+
+    def test_explicitly_unavailable_http_200_is_excluded_from_parse_rate(self):
+        unavailable = LISTING_URL.replace("895532233", "895532234")
+
+        def fetch(url):
+            if url.endswith("sitemap-v2-listings-part-1.xml"):
+                return f"<urlset><url><loc>{LISTING_URL}</loc></url><url><loc>{unavailable}</loc></url></urlset>"
+            if url == unavailable:
+                return '<caption class="UnavailableWrapper_unavailableWrapper__FrmQU"><p><span>Esse imóvel está indisponível :(</span></p></caption>'
+            return fixture_fetch(url)
+
+        collector = QuintoAndarCollector(delay_seconds=0, fetch_text=fetch)
+        database = PostgresDatabase(SQLiteConnectionAdapter())
+        self.addCleanup(database.close)
+        with redirect_stdout(StringIO()):
+            run_collection(collector, database)
+
+        metrics = database.get_collection_run(1).metrics
+        self.assertEqual(metrics["pages_unavailable"], 1)
+        self.assertEqual(metrics["pages_unparsed"], 0)
+        self.assertEqual(metrics["page_parse_success_fraction"], 1.0)
+        self.assertEqual(collector.missing_source_listing_ids, ("895532234",))
+
     def test_collects_and_normalizes_public_structured_listing(self):
         collector = QuintoAndarCollector(delay_seconds=0, fetch_text=fixture_fetch)
         output = StringIO()

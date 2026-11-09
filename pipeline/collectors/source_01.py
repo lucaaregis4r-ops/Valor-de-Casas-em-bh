@@ -18,8 +18,8 @@ from .base import Collector
 # Reuse the established QuintoAndar structured-data parser. This collector has
 # its own conservative HTTP client and never calls the legacy browser-like one.
 from scrape_imoveis_bh import (  # noqa: E402
-    RMBH_SLUGS,
     is_rm_bh_city,
+    looks_like_rm_bh,
     parse_quintoandar_listing,
 )
 
@@ -28,6 +28,10 @@ SITEMAP_URL = "https://www.quintoandar.com.br/sitemap-v2.xml"
 QUINTOANDAR_HOST = "quintoandar.com.br"
 logger = logging.getLogger(__name__)
 _SOURCE_ID_IN_PATH = re.compile(r"/(?:imovel|imóvel)/([^/]+)", re.IGNORECASE)
+_UNAVAILABLE_LISTING = re.compile(
+    r"<caption\b[^>]*>\s*<p\b[^>]*>\s*<span\b[^>]*>\s*Esse imóvel está indisponível\b",
+    re.IGNORECASE,
+)
 
 
 class CollectionDeadlineExceeded(TimeoutError):
@@ -131,8 +135,10 @@ class QuintoAndarCollector(Collector):
             "candidate_pages": 0,
             "pages_attempted": 0,
             "pages_not_found": 0,
+            "pages_unavailable": 0,
             "pages_failed": 0,
             "pages_fetched": 0,
+            "pages_unparsed": 0,
             "records_parsed": 0,
             "truncated": False,
             "geocoding_cache_hits": 0,
@@ -163,7 +169,7 @@ class QuintoAndarCollector(Collector):
                 lower_url = url.lower()
                 if "/imovel/" not in lower_url or "/alugar/" not in lower_url:
                     continue
-                if not any(slug in lower_url for slug in RMBH_SLUGS):
+                if not looks_like_rm_bh(url):
                     continue
                 canonical = normalize_url(url)
                 if canonical and canonical not in seen_urls:
@@ -187,10 +193,7 @@ class QuintoAndarCollector(Collector):
             except urllib.error.HTTPError as error:
                 # A removed ad is expected; access blocks and rate limits stop the run.
                 if error.code == 404:
-                    self._metrics["pages_not_found"] += 1
-                    match = _SOURCE_ID_IN_PATH.search(urlsplit(url).path)
-                    if match:
-                        self._missing_source_listing_ids.add(match.group(1))
+                    self._record_unavailable(url, "pages_not_found")
                     continue
                 if error.code in {408, 425} or 500 <= error.code < 600:
                     self._record_page_failure(url, error)
@@ -202,15 +205,20 @@ class QuintoAndarCollector(Collector):
                 self._record_page_failure(url, error)
                 continue
             self._metrics["pages_fetched"] += 1
+            # QuintoAndar can serve its explicit unavailable listing page as HTTP 200.
+            if _UNAVAILABLE_LISTING.search(page):
+                self._record_unavailable(url, "pages_unavailable")
+                continue
             try:
                 row = parse_quintoandar_listing(url, page, entry.get("lastmod", ""))
             except (ValueError, TypeError, KeyError, ET.ParseError) as error:
-                self._metrics["pages_unparsed"] = int(self._metrics.get("pages_unparsed", 0)) + 1
+                self._metrics["pages_unparsed"] += 1
                 self._record_page_failure(url, error)
                 continue
-            if not row or row.get("operation") != "rent":
-                continue
-            if row.get("city") and not is_rm_bh_city(row["city"]):
+            if not row or row.get("operation") != "rent" or (
+                row.get("city") and not is_rm_bh_city(row["city"])
+            ):
+                self._metrics["pages_unparsed"] += 1
                 continue
 
             records.append(row)
@@ -255,6 +263,12 @@ class QuintoAndarCollector(Collector):
                     location_precision="neighborhood",
                 )
         return listing, observation
+
+    def _record_unavailable(self, url: str, metric: str) -> None:
+        self._metrics[metric] += 1
+        match = _SOURCE_ID_IN_PATH.search(urlsplit(url).path)
+        if match:
+            self._missing_source_listing_ids.add(match.group(1))
 
     def _record_page_failure(self, url: str, error: Exception) -> None:
         self._metrics["pages_failed"] = int(self._metrics.get("pages_failed", 0)) + 1

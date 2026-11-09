@@ -80,7 +80,7 @@ class PostgresDatabase:
         observed_at: datetime,
         missing_source_listing_ids: tuple[str, ...] = (),
     ) -> tuple[int, int, int]:
-        """Persist all accepted snapshots and known 404s in one transaction."""
+        """Persist all accepted snapshots and confirmed unavailable listings in one transaction."""
         records_new = 0
         records_updated = 0
         records_missing = 0

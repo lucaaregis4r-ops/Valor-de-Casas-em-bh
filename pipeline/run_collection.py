@@ -7,16 +7,14 @@ from .collectors.base import Collector
 from .database import PostgresDatabase
 from .ingest import IngestionSummary, persist_prepared_collection, prepare_collection
 from .models import CollectionRun, CollectionStatus
-from .validation import CollectionValidationPolicy, validate_prepared_collection
+from .validation import CollectionValidationPolicy, eligible_page_attempts, validate_prepared_collection
 
 
 def _run_metrics(collector: Collector, prepared, elapsed_seconds: float) -> dict[str, object]:
     metrics: dict[str, object] = dict(collector.metrics)
     metrics["duration_seconds"] = round(elapsed_seconds, 3)
-    attempted = int(metrics.get("pages_attempted", 0) or 0)
-    not_found = int(metrics.get("pages_not_found", 0) or 0)
     failed_pages = int(metrics.get("pages_failed", 0) or 0)
-    denominator = max(0, attempted - not_found)
+    denominator = eligible_page_attempts(metrics)
     metrics["page_failure_fraction"] = round(failed_pages / denominator, 6) if denominator else None
     fetched_pages = max(0, denominator - failed_pages)
     parsed_pages = metrics.get("records_parsed")

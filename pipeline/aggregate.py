@@ -101,7 +101,7 @@ def _public_listing(
 
 
 _PUBLIC_HEALTH_METRICS = (
-    "candidate_pages", "pages_attempted", "pages_fetched", "pages_not_found", "pages_failed",
+    "candidate_pages", "pages_attempted", "pages_fetched", "pages_not_found", "pages_unavailable", "pages_failed",
     "pages_unparsed", "records_parsed", "records_received", "records_found", "records_new",
     "records_updated", "records_missing", "duplicate_records_removed", "normalization_error_count",
     "normalization_success_fraction", "page_failure_fraction", "page_parse_success_fraction",

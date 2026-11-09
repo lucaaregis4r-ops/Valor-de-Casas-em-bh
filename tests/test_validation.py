@@ -107,7 +107,7 @@ class CollectionValidationTests(unittest.TestCase):
                     "records_parsed": 2,
                 }
 
-        with self.assertRaisesRegex(CollectionValidationError, "geraram anúncio normalizado"):
+        with self.assertRaisesRegex(CollectionValidationError, "páginas elegíveis geraram anúncio legível"):
             run_collection(ParseFailureCollector(2), self.database, observed_at=self.first_seen)
 
         connection = self.database.connection.connection
