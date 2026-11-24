@@ -8,6 +8,12 @@ Observatório cartográfico do mercado residencial de Belo Horizonte. O site est
 - **Bairros:** índice e perfis que mostram o histórico de venda e a oferta atual de aluguel em blocos distintos.
 - **Metodologia:** fontes, períodos e limites de interpretação.
 
+## Uma visão do Mosaico
+
+![Mapa do Mosaico de Moradia BH com medianas por bairro](docs/screenshots/moradia-bh-mosaico-2026.png)
+
+Captura de 21/10/2026. Áreas cinzas indicam amostra insuficiente; os valores representam anúncios, não avaliações dos imóveis.
+
 A navegação usa fragmentos (`#/atlas`, `#/agora`, `#/bairro/santa-tereza`) para funcionar no GitHub Pages sem configuração de servidor. Para pré-visualizar localmente:
 
 ```bash
