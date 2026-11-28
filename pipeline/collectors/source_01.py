@@ -29,7 +29,10 @@ QUINTOANDAR_HOST = "quintoandar.com.br"
 logger = logging.getLogger(__name__)
 _SOURCE_ID_IN_PATH = re.compile(r"/(?:imovel|imóvel)/([^/]+)", re.IGNORECASE)
 _UNAVAILABLE_LISTING = re.compile(
-    r"<caption\b[^>]*>\s*<p\b[^>]*>\s*<span\b[^>]*>\s*Esse imóvel está indisponível\b",
+    r"(?:"
+    r"<caption\b[^>]*>\s*<p\b[^>]*>\s*<span\b[^>]*>\s*Esse imóvel está indisponível\b"
+    r"|<title\b[^>]*>\s*Imóvel indisponível\b"
+    r")",
     re.IGNORECASE,
 )
 

@@ -5,7 +5,7 @@ const money = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL', 
 const number = new Intl.NumberFormat('pt-BR');
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char]));
 export const neighborhoodSlug = name => norm(name).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-export const profileLink = name => `<a class="profile-link" href="#/bairro/${encodeURIComponent(neighborhoodSlug(name))}">Ver perfil completo ↗</a>`;
+export const profileLink = name => `<a class="profile-link" href="#/bairro/${encodeURIComponent(neighborhoodSlug(name))}">Ver dados do bairro ↗</a>`;
 
 export function neighborhoodNames(points, current) {
   return [...new Set([...points, ...current].map(item => item.neighborhood).filter(Boolean))]
@@ -15,7 +15,7 @@ export function neighborhoodNames(points, current) {
 export function renderDirectory(names, term = '') {
   const matching = names.filter(name => norm(name).includes(norm(term)));
   document.getElementById('bairroDirectory').innerHTML = matching.map(name =>
-    `<a href="#/bairro/${encodeURIComponent(neighborhoodSlug(name))}"><strong>${escapeHtml(name)}</strong><span>Ver perfil ↗</span></a>`
+    `<a href="#/bairro/${encodeURIComponent(neighborhoodSlug(name))}"><strong>${escapeHtml(name)}</strong><span>Ver dados do bairro ↗</span></a>`
   ).join('') || '<p>Nenhum bairro encontrado.</p>';
 }
 
@@ -47,13 +47,13 @@ export function renderProfile(slug, points, current, daily, meta, names) {
   const dates = daily.filter(item => norm(item.neighborhood) === key && item.city === city).sort((a,b) => a.date.localeCompare(b.date));
   const latest = dates.at(-1);
   const update = meta?.last_successful_update ? new Date(meta.last_successful_update).toLocaleString('pt-BR') : 'sem coleta válida';
-  document.getElementById('profileSubtitle').textContent = 'Belo Horizonte · leitura das bases disponíveis para este bairro';
-  historical.innerHTML = `<div class="block-head"><span>01 / ATLAS</span><h2>Histórico de venda · 2021—2026</h2><p>Medianas do preço pedido por m² de apartamentos. Bases históricas consolidadas.</p></div><div class="profile-stats">
+  document.getElementById('profileSubtitle').textContent = 'Belo Horizonte · dados disponíveis para este bairro';
+  historical.innerHTML = `<div class="block-head"><span>01 / ATLAS</span><h2>Preços de venda · 2021—2026</h2><p>Mediana do preço pedido por m² para apartamentos, com base em anúncios de venda.</p></div><div class="profile-stats">
     ${stat(old.length >= 5 ? formatMoney(m21) : 'amostra insuficiente', `2021 · ${number.format(old.length)} imóveis`)}
     ${stat(newer.length >= 5 ? formatMoney(m26) : 'amostra insuficiente', `2026 · ${number.format(newer.length)} imóveis`)}
     ${stat(delta == null ? 'sem comparação' : `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`, 'Variação do preço/m²')}
-  </div><p class="block-note">Comparação disponível com pelo menos 5 anúncios em cada ano. Os preços são pedidos, não transações.</p>`;
-  recent.innerHTML = `<div class="block-head"><span>02 / MERCADO AGORA</span><h2>Aluguel anunciado · coletas recentes</h2><p>Observação da oferta ativa; não é continuação da série histórica de venda.</p></div><div class="profile-stats">
+  </div><p class="block-note">A comparação exige pelo menos 5 anúncios em cada ano. Os valores são pedidos nos anúncios, não preços de transação.</p>`;
+  recent.innerHTML = `<div class="block-head"><span>02 / MERCADO AGORA</span><h2>Aluguéis anunciados · coletas recentes</h2><p>Resumo dos anúncios de aluguel ativos nas coletas recentes; não é uma continuação do histórico de vendas.</p></div><div class="profile-stats">
     ${stat(number.format(listings.length), 'Anúncios ativos')}
     ${stat(listings.length >= 5 ? formatMoney(finiteMedian(listings, 'price')) : 'amostra insuficiente', 'Mediana do aluguel pedido')}
     ${stat(listings.length >= 5 ? formatMoney(finiteMedian(listings, 'condo_fee')) : 'amostra insuficiente', 'Mediana do condomínio informado')}
@@ -65,7 +65,7 @@ export function renderComparison(points) {
   const names = [...document.getElementById('compareNeighborhoods').selectedOptions].map(option => option.value);
   const target = document.getElementById('comparisonResults');
   if (names.length < 2) {
-    target.innerHTML = '<p class="hint">Escolha pelo menos dois bairros para ver a comparação.</p>';
+    target.innerHTML = '<p class="hint">Escolha ao menos dois bairros para comparar.</p>';
     return;
   }
   const saleApartments = points.filter(p => p.operation === 'sale' && p.property_type === 'apartment' && p.city === 'Belo Horizonte');
@@ -77,5 +77,5 @@ export function renderComparison(points) {
     const b = newer.length >= 5 ? finiteMedian(newer, 'price_m2') : null;
     return `<tr><th scope="row"><a href="#/bairro/${encodeURIComponent(neighborhoodSlug(name))}">${escapeHtml(name)}</a></th><td>${formatMoney(a)}<small>n = ${number.format(old.length)}</small></td><td>${formatMoney(b)}<small>n = ${number.format(newer.length)}</small></td><td>${a && b ? `${b >= a ? '+' : ''}${((b/a-1)*100).toFixed(1)}%` : 'sem comparação'}</td></tr>`;
   });
-  target.innerHTML = `<div class="table-scroll"><table><thead><tr><th>Bairro</th><th>2021 · R$/m²</th><th>2026 · R$/m²</th><th>Variação</th></tr></thead><tbody>${rows.join('')}</tbody></table></div><p class="hint">Medianas de anúncios de venda de apartamentos em Belo Horizonte. Mínimo de 5 observações por ano.</p>`;
+  target.innerHTML = `<div class="table-scroll"><table><thead><tr><th>Bairro</th><th>2021 · R$/m²</th><th>2026 · R$/m²</th><th>Variação</th></tr></thead><tbody>${rows.join('')}</tbody></table></div><p class="hint">Medianas de preços pedidos em anúncios de venda de apartamentos em Belo Horizonte. Mínimo de 5 anúncios por ano.</p>`;
 }

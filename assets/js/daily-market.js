@@ -50,19 +50,19 @@ function renderCollectionStatus() {
   const failureDetails = [
     lastSuccess ? `Dados exibidos da coleta de ${lastSuccess}.` : 'Ainda não há uma coleta válida.',
     lastAttempt ? `Tentativa mais recente em ${lastAttempt}.` : '',
-    Number.isFinite(readRate) ? `Leitura de ${fmtReadRate.format(readRate)} das páginas elegíveis.` : ''
+    Number.isFinite(readRate) ? `${fmtReadRate.format(readRate)} das páginas elegíveis foram lidas.` : ''
   ].filter(Boolean).join(' ');
   const presentations = {
-    healthy: ['success', 'Dados atualizados', lastSuccess ? `Última coleta válida em ${lastSuccess}.` : 'A coleta diária está saudável.'],
-    success: ['success', 'Dados atualizados', lastSuccess ? `Última coleta válida em ${lastSuccess}.` : 'A coleta diária está saudável.'],
-    degraded: ['degraded', 'Atualização parcial', lastSuccess ? `Última coleta válida em ${lastSuccess}. Uma fonte requer atenção.` : 'A base válida foi preservada enquanto uma fonte requer atenção.'],
-    running: ['running', 'Coleta em andamento', 'Os novos dados serão publicados depois da validação.'],
+    healthy: ['success', 'Dados atualizados', lastSuccess ? `Última coleta válida em ${lastSuccess}.` : 'A coleta diária foi concluída.'],
+    success: ['success', 'Dados atualizados', lastSuccess ? `Última coleta válida em ${lastSuccess}.` : 'A coleta diária foi concluída.'],
+    degraded: ['degraded', 'Coleta parcial', lastSuccess ? `Última coleta válida em ${lastSuccess}. Algumas fontes precisam de atenção.` : 'Os dados válidos foram mantidos; algumas fontes precisam de atenção.'],
+    running: ['running', 'Coleta em andamento', 'Os dados serão publicados depois da validação.'],
     failed: [
       'failed',
-      lastSuccess ? 'Última coleta não concluída' : 'Primeira coleta não concluída',
+      lastSuccess ? 'A última coleta falhou' : 'Ainda não há dados válidos',
       failureDetails
     ],
-    unknown: ['degraded', 'Aguardando dados diários', 'O histórico de 2021 e 2026 continua disponível.']
+    unknown: ['degraded', 'Aguardando a coleta diária', 'O histórico de 2021 e 2026 continua disponível.']
   };
   const [state, title, detail] = presentations[health] || presentations.unknown;
   banner.dataset.state = state;
@@ -92,14 +92,14 @@ function listingPopup(listing) {
   return `
     <strong>${escapeHtml(listing.title || 'Anúncio de aluguel')}</strong><br>
     ${escapeHtml(listing.neighborhood || 'Sem bairro')}, ${escapeHtml(listing.city || 'sem cidade')}<br>
-    Aluguel atual: <strong>${listing.price == null ? 'sem valor' : fmtBRL.format(listing.price)}</strong><br>
+    Aluguel pedido: <strong>${listing.price == null ? 'sem valor' : fmtBRL.format(listing.price)}</strong><br>
     Condomínio: ${listing.condo_fee == null ? 'sem valor' : fmtBRL.format(listing.condo_fee)} · IPTU: ${listing.iptu == null ? 'sem valor' : fmtBRL.format(listing.iptu)}<br>
     Total anunciado: <strong>${listing.total_price == null ? 'sem valor' : fmtBRL.format(listing.total_price)}</strong><br>
     Aluguel/m²: ${listing.price_m2 == null ? 'sem dado' : fmtBRL.format(listing.price_m2)}<br>
     Localização: ${listing.location_precision === 'neighborhood' ? 'aproximada pelo centro do bairro' : 'informada no anúncio'}<br>
     Observado desde: ${localDateLabel(listing.first_seen_at)}<br>
     Última observação: ${localDateLabel(listing.last_seen_at)}<br>
-    Tempo acompanhado: ${fmtNum.format(listing.days_listed || 0)} dias<br>
+    Tempo no levantamento: ${fmtNum.format(listing.days_listed || 0)} dias<br>
     Fonte: ${escapeHtml(listing.source || 'sem informação')}<br>
     ${historyMarkup}<br>${safeExternalLink(listing.url)}<br>${listing.neighborhood ? profileLink(listing.neighborhood) : ''}
   `;
@@ -112,15 +112,35 @@ const dailyMetricLabels = {
 const eventTypesByMetric = {
   new:'new', removed:'removed', price_reduced:'price_reduced', price_increased:'price_increased'
 };
+function listingPriceDrop(listing) {
+  const history = (listing.price_history || []).filter(point => Number.isFinite(point.price));
+  if (history.length < 2) return { dropped: false, amount: 0, pct: 0 };
+  const initial = history[0].price;
+  const current = Number.isFinite(listing.price) ? listing.price : history.at(-1).price;
+  if (!(initial > current)) return { dropped: false, amount: 0, pct: 0 };
+  return { dropped: true, amount: initial - current, pct: (current / initial) - 1 };
+}
 function currentDailyFilters() {
+  const belowBtn = document.querySelector('.quick-chip[data-chip="belowMedian"]');
+  const dropBtn = document.querySelector('.quick-chip[data-chip="priceDrop"]');
   return {
-    city:document.getElementById('cityFilter').value,
-    neighborhood:document.getElementById('neighborhoodFilter').value
+    city: document.getElementById('cityFilter').value,
+    neighborhood: document.getElementById('neighborhoodFilter').value,
+    propertyType: document.getElementById('typeFilterWrap').hidden ? 'all' : document.getElementById('typeFilter').value,
+    minRooms: Number(document.getElementById('dailyRooms')?.value || 0),
+    minArea: Number(document.getElementById('dailyMinArea')?.value || 0),
+    onlyBelowMedian: belowBtn?.getAttribute('aria-pressed') === 'true',
+    onlyPriceDrop: dropBtn?.getAttribute('aria-pressed') === 'true'
   };
 }
-function matchesDailyArea(item, filters) {
+function matchesDailyArea(item, filters, isListing = false) {
   if (filters.city !== 'all' && norm(item.city) !== norm(filters.city)) return false;
   if (filters.neighborhood !== 'all' && norm(item.neighborhood) !== norm(filters.neighborhood)) return false;
+  if (filters.propertyType !== 'all' && item.property_type && item.property_type !== filters.propertyType) return false;
+  if (isListing) {
+    if (filters.minRooms > 0 && !(Number(item.rooms) >= filters.minRooms)) return false;
+    if (filters.minArea > 0 && !(Number(item.area) >= filters.minArea)) return false;
+  }
   return true;
 }
 function formatDailyMetric(value, metric) {
@@ -144,10 +164,10 @@ function eventPopup(event) {
 function dailyNeighborhoodPopup(row) {
   return `<strong>${escapeHtml(row.neighborhood || 'Sem bairro')}</strong><br>
     Cidade: ${escapeHtml(row.city || 'sem cidade')}<br>
-    Oferta ativa: ${fmtNum.format(row.active || 0)}<br>
-    Mediana aluguel: ${row.median_rent == null ? 'sem dado' : fmtBRL.format(row.median_rent)}<br>
-    Mediana aluguel/m²: ${row.median_price_m2 == null ? 'sem dado' : `${fmtBRL.format(row.median_price_m2)}/m²`}<br>
-    P25 / P75 aluguel/m²: ${row.p25_price_m2 == null ? 'sem dado' : `${fmtBRL.format(row.p25_price_m2)} / ${fmtBRL.format(row.p75_price_m2)}`}<br>
+    Anúncios ativos: ${fmtNum.format(row.active || 0)}<br>
+    Mediana do aluguel pedido: ${row.median_rent == null ? 'sem dado' : fmtBRL.format(row.median_rent)}<br>
+    Mediana do aluguel pedido/m²: ${row.median_price_m2 == null ? 'sem dado' : `${fmtBRL.format(row.median_price_m2)}/m²`}<br>
+    P25 / P75 do aluguel/m²: ${row.p25_price_m2 == null ? 'sem dado' : `${fmtBRL.format(row.p25_price_m2)} / ${fmtBRL.format(row.p75_price_m2)}`}<br>
     Novos: ${fmtNum.format(row.new || 0)} · retirados: ${fmtNum.format(row.removed || 0)}<br>
     Reduções: ${fmtNum.format(row.price_reduced || 0)} · aumentos: ${fmtNum.format(row.price_increased || 0)}<br>
     Variação 7d / 30d: ${pct(row.variation_7d)} / ${pct(row.variation_30d)}<br>
@@ -197,33 +217,12 @@ function selectedPriceRange() {
     invalid:minRaw !== '' && maxRaw !== '' && Number(minRaw) > Number(maxRaw)
   };
 }
-function drawCurrentRentalListings(listings, field) {
-  const located = listings.filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lon));
-  const layer = L.layerGroup();
-  const cap = percentile(located.map(item => item[field]).filter(Number.isFinite), .95) || 1;
-  located.forEach(item => {
-    const color = colorForRatio(Math.max(.05, Math.min(item[field] || 0, cap) / cap));
-    const popup = listingPopup(item);
-    L.circleMarker([item.lat, item.lon], {
-      radius:5, color:'#334155', weight:.7, fillColor:color, fillOpacity:.72
-    }).bindTooltip(`${escapeHtml(item.neighborhood || 'Sem bairro')} · ${priceLabel(item[field], field)}`, {sticky:true})
-      .bindPopup(popup, {maxWidth:330}).addTo(layer);
-  });
-  layer.addTo(map);
-  currentLayers.push(layer);
-  if (located.length) {
-    window.legendControl = L.control({position:'bottomright'});
-    window.legendControl.onAdd = () => {
-      const div = L.DomUtil.create('div', 'legend');
-      div.innerHTML = `<strong>Cor · ${priceViews[field].label}</strong><div class="bar-price"></div><span>R$ 0 → ${priceLabel(cap, field)} ou mais</span>`;
-      return div;
-    };
-    window.legendControl.addTo(map);
-  }
-  return located.length;
-}
-function renderDailyDeals(listings) {
-  const host = document.getElementById('dailyDeals');
+let listingMarkersById = new Map();
+let dealsSortMode = 'discount';
+let dealsVisibleCount = 9;
+let lastDealsFilterKey = '';
+
+function computeBenchmarks() {
   const benchmarkListings = currentListings.filter(item => item.available && safeExternalUrl(item.url)
     && Number.isFinite(item.area) && item.area >= 15 && item.area <= 500
     && Number.isFinite(item.total_price) && item.total_price >= 200 && item.total_price <= 50000
@@ -240,25 +239,164 @@ function renderDailyDeals(listings) {
   }
   const cityMedians = new Map([...byCity].map(([key, values]) => [key, median(values)]));
   const neighborhoodMedians = new Map([...byNeighborhood].map(([key, values]) => [key, median(values)]));
-  const eligible = new Set(benchmarkListings);
-  const candidates = listings.filter(item => eligible.has(item)).map(item => {
-    const cityKey = `${norm(item.city)}|${item.property_type}`;
-    const neighborhoodKey = `${cityKey}|${norm(item.neighborhood)}`;
-    const cityValues = byCity.get(cityKey) || [];
-    const neighborhoodValues = byNeighborhood.get(neighborhoodKey) || [];
-    if (cityValues.length < 30 || neighborhoodValues.length < 8) return null;
-    const costM2 = item.total_price / item.area;
-    const cityMedian = cityMedians.get(cityKey), neighborhoodMedian = neighborhoodMedians.get(neighborhoodKey);
-    const cityDiscount = 1 - costM2 / cityMedian;
-    const neighborhoodDiscount = 1 - costM2 / neighborhoodMedian;
-    if (cityDiscount <= 0 || neighborhoodDiscount <= 0) return null;
-    return {item, costM2, cityDiscount, neighborhoodDiscount, score:Math.min(cityDiscount, neighborhoodDiscount)};
-  }).filter(Boolean).sort((a,b) => b.score - a.score || a.item.total_price - b.item.total_price).slice(0, 3);
+  return { byCity, byNeighborhood, cityMedians, neighborhoodMedians };
+}
+
+function enrichListing(item, benchmarks) {
+  const hasArea = Number.isFinite(item.area) && item.area > 0 && Number.isFinite(item.total_price);
+  const costM2 = hasArea ? item.total_price / item.area : null;
+  const cityKey = `${norm(item.city)}|${item.property_type}`;
+  const neighborhoodKey = `${cityKey}|${norm(item.neighborhood)}`;
+  const cityValues = benchmarks.byCity.get(cityKey) || [];
+  const neighborhoodValues = benchmarks.byNeighborhood.get(neighborhoodKey) || [];
+  const cityMedian = cityValues.length >= 10 ? benchmarks.cityMedians.get(cityKey) : null;
+  const neighborhoodMedian = neighborhoodValues.length >= 5 ? benchmarks.neighborhoodMedians.get(neighborhoodKey) : null;
+  const cityDiscount = costM2 && cityMedian ? 1 - costM2 / cityMedian : null;
+  const neighborhoodDiscount = costM2 && neighborhoodMedian ? 1 - costM2 / neighborhoodMedian : null;
+  const refMedian = neighborhoodMedian ?? cityMedian;
+  const estimatedMonthlySaving = (costM2 && refMedian && costM2 < refMedian)
+    ? Math.max(0, (refMedian - costM2) * item.area)
+    : 0;
+  const drop = listingPriceDrop(item);
+  const bestDiscount = neighborhoodDiscount ?? cityDiscount ?? -999;
+  return {
+    item, costM2, cityDiscount, neighborhoodDiscount,
+    estimatedMonthlySaving, drop, bestDiscount
+  };
+}
+
+function drawCurrentRentalListings(listings, field) {
+  listingMarkersById = new Map();
+  const located = listings.filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lon));
+  const layer = L.layerGroup();
+  const cap = percentile(located.map(item => item[field]).filter(Number.isFinite), .95) || 1;
+  located.forEach(item => {
+    const color = colorForRatio(Math.max(.05, Math.min(item[field] || 0, cap) / cap));
+    const popup = listingPopup(item);
+    const marker = L.circleMarker([item.lat, item.lon], {
+      radius:5, color:'#334155', weight:.7, fillColor:color, fillOpacity:.72
+    }).bindTooltip(`${escapeHtml(item.neighborhood || 'Sem bairro')} · ${priceLabel(item[field], field)}`, {sticky:true})
+      .bindPopup(popup, {maxWidth:330});
+    marker.addTo(layer);
+    if (item.id) listingMarkersById.set(String(item.id), marker);
+  });
+  layer.addTo(map);
+  currentLayers.push(layer);
+  if (located.length) {
+    window.legendControl = L.control({position:'bottomright'});
+    window.legendControl.onAdd = () => {
+      const div = L.DomUtil.create('div', 'legend');
+      div.innerHTML = `<strong>Cor · ${priceViews[field].label}</strong><div class="bar-price"></div><span>R$ 0 → ${priceLabel(cap, field)} ou mais</span>`;
+      return div;
+    };
+    window.legendControl.addTo(map);
+  }
+  return located.length;
+}
+
+function focusListingOnMap(listingId) {
+  const item = currentListings.find(entry => String(entry.id) === String(listingId));
+  const marker = listingMarkersById.get(String(listingId));
+  if (!item || !Number.isFinite(item.lat) || !Number.isFinite(item.lon)) return;
+  document.getElementById('map').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  map.setView([item.lat, item.lon], Math.max(map.getZoom(), 16), { animate: true });
+  if (marker) marker.openPopup();
+}
+
+function renderDailyDeals(enrichedListings, filterKey) {
+  const host = document.getElementById('dailyDeals');
+  if (filterKey !== lastDealsFilterKey) {
+    dealsVisibleCount = 9;
+    lastDealsFilterKey = filterKey;
+  }
+  const sorters = {
+    discount: (a, b) => b.bestDiscount - a.bestDiscount || (a.item.total_price || 0) - (b.item.total_price || 0),
+    total_asc: (a, b) => (a.item.total_price || 9e9) - (b.item.total_price || 9e9),
+    m2_asc: (a, b) => (a.costM2 || 9e9) - (b.costM2 || 9e9),
+    price_drop: (a, b) => (b.drop.amount - a.drop.amount) || b.bestDiscount - a.bestDiscount,
+    newest: (a, b) => (a.item.days_listed ?? 9e9) - (b.item.days_listed ?? 9e9)
+  };
+  const sorted = [...enrichedListings].filter(entry => safeExternalUrl(entry.item.url)).sort(sorters[dealsSortMode] || sorters.discount);
+  const visible = sorted.slice(0, dealsVisibleCount);
+  const remaining = Math.max(0, sorted.length - visible.length);
   const propertyTypes = {apartment:'Apartamento', house:'Casa', kitnet:'Kitnet'};
-  host.innerHTML = `<div class="daily-deals-heading"><div><span>OLHAR DE PERTO</span><h2>Anúncios abaixo da referência</h2><p>Até três ofertas do mesmo tipo de imóvel, comparadas pelo total anunciado por m² com as medianas do bairro e da cidade.</p></div><small>${fmtNum.format(listings.length)} anúncios na seleção</small></div>
-    ${candidates.length ? `<div class="daily-deals-grid">${candidates.map(({item, costM2, cityDiscount, neighborhoodDiscount}, index) => `
-      <article class="daily-deal-card"><span class="daily-deal-index">0${index + 1} / OFERTA</span><h3>${escapeHtml(item.neighborhood || 'Bairro não informado')}</h3><p class="daily-deal-city">${escapeHtml(item.city || 'Cidade não informada')} · ${escapeHtml(propertyTypes[item.property_type] || 'Imóvel')} · ${fmtNum.format(item.area)} m²</p><div class="daily-deal-price"><strong>${fmtBRL.format(item.total_price)}</strong><small>/mês · aluguel + condomínio + IPTU</small></div><div class="daily-deal-details"><span>${fmtBRL.format(costM2)}/m² total</span><span>${Math.round(neighborhoodDiscount * 100)}% abaixo do bairro</span><span>${Math.round(cityDiscount * 100)}% abaixo da cidade</span></div><a href="${escapeHtml(safeExternalUrl(item.url))}" target="_blank" rel="noopener noreferrer">Ver anúncio <b aria-hidden="true">↗</b></a></article>`).join('')}</div>` : '<p class="daily-deals-empty">Nenhum anúncio da seleção tem amostra suficiente e preço abaixo das duas referências.</p>'}
-    <p class="daily-deals-note">Referências: pelo menos 8 anúncios do mesmo tipo no bairro e 30 na cidade. Preço baixo não confirma qualidade, disponibilidade ou localização exata; confira no anúncio.</p>`;
+
+  host.innerHTML = `<div class="daily-deals-heading">
+      <div><span>OPORTUNIDADES ENCONTRADAS</span><h2>Imóveis ordenados pelo melhor custo-benefício</h2><p>Compare o custo mensal total (aluguel + condomínio + IPTU) com a mediana do bairro e da cidade.</p></div>
+      <div class="daily-deals-actions">
+        <span class="deals-count">${fmtNum.format(sorted.length)} imóveis na busca</span>
+        <div class="deals-sort-wrap">
+          <label for="dailySort">Ordenar por</label>
+          <select id="dailySort">
+            <option value="discount"${dealsSortMode === 'discount' ? ' selected' : ''}>Maior desconto vs. bairro</option>
+            <option value="total_asc"${dealsSortMode === 'total_asc' ? ' selected' : ''}>Menor custo total/mês</option>
+            <option value="m2_asc"${dealsSortMode === 'm2_asc' ? ' selected' : ''}>Menor preço/m²</option>
+            <option value="price_drop"${dealsSortMode === 'price_drop' ? ' selected' : ''}>Maior redução de preço</option>
+            <option value="newest"${dealsSortMode === 'newest' ? ' selected' : ''}>Mais recentes no ar</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    ${visible.length ? `<div class="daily-deals-grid">${visible.map(({item, costM2, cityDiscount, neighborhoodDiscount, estimatedMonthlySaving, drop}, index) => {
+      const specs = [
+        propertyTypes[item.property_type] || 'Imóvel',
+        Number.isFinite(item.rooms) ? `${fmtNum.format(item.rooms)} ${item.rooms === 1 ? 'quarto' : 'quartos'}` : null,
+        Number.isFinite(item.area) ? `${fmtNum.format(item.area)} m²` : null,
+        Number.isFinite(item.parking_spaces) && item.parking_spaces > 0 ? `${fmtNum.format(item.parking_spaces)} ${item.parking_spaces === 1 ? 'vaga' : 'vagas'}` : null
+      ].filter(Boolean).join(' · ');
+      const breakdown = [
+        Number.isFinite(item.price) ? `Aluguel ${fmtBRL.format(item.price)}` : null,
+        Number.isFinite(item.condo_fee) && item.condo_fee > 0 ? `Cond. ${fmtBRL.format(item.condo_fee)}` : null,
+        Number.isFinite(item.iptu) && item.iptu > 0 ? `IPTU ${fmtBRL.format(item.iptu)}` : null
+      ].filter(Boolean).join(' + ');
+      const hasMapCoords = Number.isFinite(item.lat) && Number.isFinite(item.lon);
+      return `
+      <article class="daily-deal-card">
+        <div class="deal-card-top">
+          <span class="daily-deal-index">${String(index + 1).padStart(2, '0')}</span>
+          <div class="deal-badges">
+            ${neighborhoodDiscount != null && neighborhoodDiscount > 0 ? `<span class="deal-badge deal-badge-discount">${Math.round(neighborhoodDiscount * 100)}% abaixo do bairro</span>` : ''}
+            ${drop.dropped ? `<span class="deal-badge deal-badge-drop">Caiu ${fmtBRL.format(drop.amount)}</span>` : ''}
+          </div>
+        </div>
+        <h3>${escapeHtml(item.neighborhood || 'Bairro não informado')}</h3>
+        <p class="daily-deal-city">${escapeHtml(item.city || 'Cidade não informada')} · ${escapeHtml(specs)}</p>
+        <div class="daily-deal-price">
+          <strong>${fmtBRL.format(item.total_price)}<small>/mês</small></strong>
+          <small>${escapeHtml(breakdown || 'Total anunciado')}</small>
+        </div>
+        <div class="daily-deal-details">
+          ${costM2 ? `<span>${fmtBRL.format(costM2)}/m² total</span>` : ''}
+          ${cityDiscount != null && cityDiscount > 0 ? `<span>${Math.round(cityDiscount * 100)}% abaixo da cidade</span>` : ''}
+          ${estimatedMonthlySaving >= 50 ? `<span>Economia ~${fmtBRL.format(estimatedMonthlySaving)}/mês</span>` : ''}
+          <span>${fmtNum.format(item.days_listed || 0)} dias no ar</span>
+        </div>
+        <div class="deal-card-actions">
+          ${hasMapCoords ? `<button type="button" class="deal-map-btn" data-listing-id="${escapeHtml(item.id)}">Ver no mapa</button>` : ''}
+          <a href="${escapeHtml(safeExternalUrl(item.url))}" target="_blank" rel="noopener noreferrer">Ver anúncio <b aria-hidden="true">↗</b></a>
+        </div>
+      </article>`;
+    }).join('')}</div>` : '<p class="daily-deals-empty">Nenhum imóvel encontrado com esses filtros. Tente ampliar o orçamento máximo ou limpar os filtros.</p>'}
+    ${remaining > 0 ? `<div class="deals-more-wrap"><button type="button" id="dealsShowMore" class="deals-more-btn">Mostrar mais imóveis (+${fmtNum.format(Math.min(9, remaining))} de ${fmtNum.format(remaining)} restantes)</button></div>` : ''}
+    <p class="daily-deals-note">A comparação por bairro exige ao menos 5 imóveis do mesmo tipo no bairro e 10 na cidade. Confira conservação, localização exata e disponibilidade no anúncio.</p>`;
+
+  const sortEl = document.getElementById('dailySort');
+  if (sortEl) {
+    sortEl.addEventListener('change', () => {
+      dealsSortMode = sortEl.value;
+      renderDailyDeals(enrichedListings, filterKey);
+    });
+  }
+  const moreBtn = document.getElementById('dealsShowMore');
+  if (moreBtn) {
+    moreBtn.addEventListener('click', () => {
+      dealsVisibleCount += 9;
+      renderDailyDeals(enrichedListings, filterKey);
+    });
+  }
+  host.querySelectorAll('.deal-map-btn').forEach(btn => {
+    btn.addEventListener('click', () => focusListingOnMap(btn.dataset.listingId));
+  });
 }
 function dailySummary(rows, selectedDate, metric, currentContext=null) {
   const totals = rows.reduce((sum, row) => {
@@ -267,25 +405,112 @@ function dailySummary(rows, selectedDate, metric, currentContext=null) {
   }, {active:0, new:0, removed:0, price_reduced:0, price_increased:0});
   const neighborhoodMedians = rows.map(row => row.median_price_m2).filter(Number.isFinite);
   const latestDate = neighborhoodDaily.reduce((latest, row) => row.date > latest ? row.date : latest, '');
-  const currentRents = selectedDate === latestDate
+  const previousDate = neighborhoodDaily.reduce((previous, row) => row.date < selectedDate && row.date > previous ? row.date : previous, '');
+  const previousByNeighborhood = new Map(neighborhoodDaily
+    .filter(row => row.date === previousDate && matchesDailyArea(row, currentDailyFilters()) && row.neighborhood && Number(row.active) >= 5)
+    .map(row => [`${norm(row.city)}|${norm(row.neighborhood)}`, row]));
+  const previousComparisons = rows.map(row => {
+    const old = previousByNeighborhood.get(`${norm(row.city)}|${norm(row.neighborhood)}`);
+    return Number(row.active) >= 5 && old && Number(old.median_price_m2) > 0 && Number.isFinite(row.median_price_m2)
+      ? (Number(row.median_price_m2) / Number(old.median_price_m2)) - 1 : null;
+  }).filter(Number.isFinite);
+  const historicalByNeighborhood = new Map();
+  for (const row of neighborhoodDaily) {
+    if (row.date >= selectedDate || !matchesDailyArea(row, currentDailyFilters()) || Number(row.active) < 5
+      || !row.neighborhood || !Number.isFinite(row.median_price_m2)) continue;
+    const key = `${norm(row.city)}|${norm(row.neighborhood)}`;
+    if (!historicalByNeighborhood.has(key)) historicalByNeighborhood.set(key, []);
+    historicalByNeighborhood.get(key).push({date:row.date, value:Number(row.median_price_m2)});
+  }
+  const areaFilters = currentDailyFilters();
+  const cityMedians = new Map();
+  const cityValues = new Map();
+  for (const row of neighborhoodDaily) {
+    if (row.date !== selectedDate || !row.city
+      || (areaFilters.city !== 'all' && norm(row.city) !== norm(areaFilters.city))
+      || Number(row.active) < 5 || !Number.isFinite(row.median_price_m2)) continue;
+    const key = norm(row.city);
+    if (!cityValues.has(key)) cityValues.set(key, []);
+    cityValues.get(key).push(Number(row.median_price_m2));
+  }
+  for (const [city, values] of cityValues) cityMedians.set(city, median(values));
+  const historicalComparison = rows.map(row => {
+    const history = historicalByNeighborhood.get(`${norm(row.city)}|${norm(row.neighborhood)}`) || [];
+    if (Number(row.active) < 5 || !Number.isFinite(row.median_price_m2) || history.length < 3) return null;
+    const average = history.reduce((sum, point) => sum + point.value, 0) / history.length;
+    const cityMedian = cityMedians.get(norm(row.city));
+    return {
+      row, average, dates:history.length,
+      relative:(Number(row.median_price_m2) / average) - 1,
+      cityRelative:cityMedian ? (Number(row.median_price_m2) / cityMedian) - 1 : null
+    };
+  }).filter(Boolean);
+  const historicalWindow = [...historicalByNeighborhood.values()].flat().map(point => point.date).sort();
+  const historicalStart = historicalWindow[0] || null;
+  const historicalEnd = historicalWindow.at(-1) || null;
+  const relativeToHistory = median(historicalComparison.map(item => item.relative));
+  const lowerCostNeighborhoods = historicalComparison.filter(item => item.relative < 0 && item.cityRelative != null && item.cityRelative < 0);
+  const trendPrevious = median(previousComparisons);
+  const trend30Rows = rows.filter(row => Number(row.active) >= 5 && Number.isFinite(row.variation_30d));
+  const trend30d = median(trend30Rows.map(row => row.variation_30d));
+  const trend30Up = trend30Rows.filter(row => row.variation_30d > 0).length;
+  const trend30Down = trend30Rows.filter(row => row.variation_30d < 0).length;
+  const currentRentListings = selectedDate === latestDate
     ? currentListings.filter(item => item.available && matchesDailyArea(item, currentDailyFilters()))
-      .map(item => item.price).filter(Number.isFinite)
     : [];
+  const currentRents = currentRentListings.map(item => item.price).filter(Number.isFinite);
+  const reductionsObserved = currentRentListings.filter(item => {
+    const history = (item.price_history || []).filter(point => Number.isFinite(point.price));
+    return history.some((point, index) => index > 0 && point.price < history[index - 1].price);
+  }).length;
+  const medianDaysListed = median(currentRentListings.map(item => item.days_listed).filter(Number.isFinite));
+  const rankingFilters = {...currentDailyFilters(), neighborhood:'all'};
+  const rankingListings = currentListings.filter(item => item.available && matchesDailyArea(item, rankingFilters)
+    && Number.isFinite(item.total_price) && Number(item.area) > 0 && item.property_type);
+  const cityTypeGroups = new Map();
+  const neighborhoodTypeGroups = new Map();
+  for (const item of rankingListings) {
+    const cityType = `${norm(item.city)}|${item.property_type}`;
+    const neighborhoodType = `${cityType}|${norm(item.neighborhood)}`;
+    if (!cityTypeGroups.has(cityType)) cityTypeGroups.set(cityType, []);
+    cityTypeGroups.get(cityType).push(item);
+    if (item.neighborhood) {
+      if (!neighborhoodTypeGroups.has(neighborhoodType)) neighborhoodTypeGroups.set(neighborhoodType, []);
+      neighborhoodTypeGroups.get(neighborhoodType).push(item);
+    }
+  }
+  const affordabilityRows = [...neighborhoodTypeGroups.entries()].flatMap(([key, listings]) => {
+    const cityType = key.split('|').slice(0, 2).join('|');
+    const cityListings = cityTypeGroups.get(cityType) || [];
+    if (listings.length < 8 || cityListings.length < 30) return [];
+    const cityMedianM2 = median(cityListings.map(item => item.price_m2).filter(Number.isFinite));
+    const neighborhoodMedianM2 = median(listings.map(item => item.price_m2).filter(Number.isFinite));
+    return [{
+      neighborhood:listings[0].neighborhood,
+      city:listings[0].city,
+      propertyType:listings[0].property_type,
+      count:listings.length,
+      medianTotal:median(listings.map(item => item.total_price)),
+      medianM2:neighborhoodMedianM2,
+      cityRelative:cityMedianM2 ? (neighborhoodMedianM2 / cityMedianM2) - 1 : null
+    }];
+  }).sort((a,b) => a.medianTotal - b.medianTotal);
   const lastSuccess = collectionTimeLabel(publicMeta?.last_successful_update) || 'sem coleta válida';
   const sourceHealth = publicMeta?.health?.sources || {};
   const sourceHealthText = publicMeta?.sources?.length
-    ? `${sourceHealth.healthy || 0} saudáveis · ${sourceHealth.degraded || 0} atenção · ${sourceHealth.failed || 0} falhas · ${sourceHealth.running || 0} em execução`
+    ? `${sourceHealth.healthy || 0} em ordem · ${sourceHealth.degraded || 0} com atenção · ${sourceHealth.failed || 0} com falha · ${sourceHealth.running || 0} em andamento`
     : 'sem coleta';
   document.getElementById('stats').innerHTML = `
-    ${currentContext ? `<div class="stat"><strong>${fmtNum.format(currentContext.plotted)}</strong>anúncios no mapa · faixa selecionada</div><div class="stat"><strong>${currentContext.listings.length ? priceLabel(median(currentContext.listings.map(item => item[currentContext.field])), currentContext.field) : 'sem dado'}</strong>mediana da faixa · ${priceViews[currentContext.field].label}</div>` : ''}
-    <div class="stat"><strong>${fmtNum.format(totals.active)}</strong>anúncios ativos na coleta · sem faixa</div>
+    ${currentContext ? `<div class="stat"><strong>${fmtNum.format(currentContext.plotted)}</strong>anúncios no mapa · dentro da faixa de preço</div><div class="stat"><strong>${currentContext.listings.length ? priceLabel(median(currentContext.listings.map(item => item[currentContext.field])), currentContext.field) : 'sem dado'}</strong>mediana dos anúncios na faixa · ${priceViews[currentContext.field].label}</div>` : ''}
+    ${currentContext ? `<div class="stat"><strong>${pct(trendPrevious)}</strong>mudança do mercado desde a coleta anterior${previousDate ? ` · ${localDateLabel(previousDate)}` : ''} · ${previousComparisons.length} bairros</div><div class="stat"><strong>${pct(trend30d)}</strong>mudança do mercado em 30 dias · ${trend30Up} bairros em alta, ${trend30Down} em queda, ${Math.max(0, trend30Rows.length - trend30Up - trend30Down)} estáveis</div><div class="stat"><strong>${pct(relativeToHistory)}</strong>diferença mediana para a média histórica de cada bairro · ${historicalComparison.length} comparáveis</div><div class="stat"><strong>${fmtNum.format(lowerCostNeighborhoods.length)}</strong>bairros abaixo da média histórica e da mediana da cidade</div><div class="stat"><strong>${historicalStart && historicalEnd ? `${localDateLabel(historicalStart)} a ${localDateLabel(historicalEnd)}` : 'sem histórico suficiente'}</strong>período usado para a média histórica · mínimo de 3 coletas e 5 anúncios por data</div><div class="stat"><strong>${medianDaysListed == null ? 'sem dado' : `${Math.round(medianDaysListed)} dias`}</strong>tempo mediano anunciado · ${reductionsObserved} ofertas com redução observada</div>` : ''}
+    <div class="stat"><strong>${fmtNum.format(totals.active)}</strong>anúncios ativos na data (sem aplicar a faixa de preço)</div>
     <div class="stat"><strong>${fmtNum.format(totals.new)}</strong>novos anúncios</div>
-    <div class="stat"><strong>${fmtNum.format(totals.removed)}</strong>retirados</div>
-    <div class="stat"><strong>${fmtNum.format(totals.price_reduced)}</strong>reduções de preço</div>
-    <div class="stat"><strong>${currentRents.length ? fmtBRL.format(median(currentRents)) : 'sem dado'}</strong>mediana do aluguel pedido${selectedDate === latestDate ? ' · sem faixa' : ' · somente data mais recente'}</div>
-    <div class="stat"><strong>${neighborhoodMedians.length ? `${fmtBRL.format(median(neighborhoodMedians))}/m²` : 'sem dado'}</strong>mediana das medianas dos bairros</div>
+    <div class="stat"><strong>${fmtNum.format(totals.removed)}</strong>anúncios retirados</div>
+    <div class="stat"><strong>${fmtNum.format(totals.price_reduced)} / ${fmtNum.format(totals.price_increased)}</strong>anúncios com redução / aumento de preço</div>
+    <div class="stat"><strong>${currentRents.length ? fmtBRL.format(median(currentRents)) : 'sem dado'}</strong>mediana do aluguel pedido${selectedDate === latestDate ? ' · sem aplicar a faixa de preço' : ' · apenas na data mais recente'}</div>
+    <div class="stat"><strong>${neighborhoodMedians.length ? `${fmtBRL.format(median(neighborhoodMedians))}/m²` : 'sem dado'}</strong>mediana dos valores medianos por bairro</div>
     <div class="stat"><strong>${escapeHtml(lastSuccess)}</strong>última coleta válida</div>
-    <div class="stat"><strong>${escapeHtml(sourceHealthText)}</strong>saúde das fontes</div>`;
+    <div class="stat"><strong>${escapeHtml(sourceHealthText)}</strong>status das fontes</div>`;
 
   const compareDate = document.getElementById('dailyCompareDate').value;
   const compareBox = document.getElementById('compareSummary');
@@ -303,14 +528,14 @@ function dailySummary(rows, selectedDate, metric, currentContext=null) {
     const change = (next, previous) => previous ? pct((next / previous) - 1) : 'sem base';
     compareBox.hidden = false;
     compareBox.innerHTML = compareRows.length ? `
-      <div class="stat comparison-title" style="grid-column:1/-1"><strong>${localDateLabel(selectedDate)} ↔ ${localDateLabel(compareDate)}</strong>Comparação da área filtrada</div>
-      <div class="stat"><strong>${fmtNum.format(current.active)} ↔ ${fmtNum.format(earlier.active)}</strong>ativos: data principal ↔ comparação</div>
+      <div class="stat comparison-title" style="grid-column:1/-1"><strong>${localDateLabel(selectedDate)} ↔ ${localDateLabel(compareDate)}</strong>Dados da área filtrada</div>
+      <div class="stat"><strong>${fmtNum.format(current.active)} ↔ ${fmtNum.format(earlier.active)}</strong>anúncios ativos: data escolhida ↔ comparação</div>
       <div class="stat"><strong>${change(current.active, earlier.active)}</strong>mudança na oferta ativa</div>
-      <div class="stat"><strong>${current.medianM2 == null ? 'sem dado' : fmtBRL.format(current.medianM2)} ↔ ${earlier.medianM2 == null ? 'sem dado' : fmtBRL.format(earlier.medianM2)}</strong>mediana das medianas de aluguel/m²</div>
-      <div class="stat"><strong>${current.medianM2 == null || earlier.medianM2 == null ? 'sem base' : change(current.medianM2, earlier.medianM2)}</strong>mudança na mediana das medianas</div>
-      <div class="stat"><strong>${fmtNum.format(current.new)} ↔ ${fmtNum.format(earlier.new)}</strong>novos anúncios: principal ↔ comparação</div>
-      <div class="stat"><strong>${fmtNum.format(current.removed)} ↔ ${fmtNum.format(earlier.removed)}</strong>retirados: principal ↔ comparação</div>`
-      : `<div class="stat" style="grid-column:1/-1"><strong>${localDateLabel(compareDate)}</strong>Sem dados para a data de comparação com os filtros atuais.</div>`;
+      <div class="stat"><strong>${current.medianM2 == null ? 'sem dado' : fmtBRL.format(current.medianM2)} ↔ ${earlier.medianM2 == null ? 'sem dado' : fmtBRL.format(earlier.medianM2)}</strong>mediana por bairro do aluguel/m²</div>
+      <div class="stat"><strong>${current.medianM2 == null || earlier.medianM2 == null ? 'sem base' : change(current.medianM2, earlier.medianM2)}</strong>variação da mediana por bairro</div>
+      <div class="stat"><strong>${fmtNum.format(current.new)} ↔ ${fmtNum.format(earlier.new)}</strong>novos anúncios: data escolhida ↔ comparação</div>
+      <div class="stat"><strong>${fmtNum.format(current.removed)} ↔ ${fmtNum.format(earlier.removed)}</strong>anúncios retirados: data escolhida ↔ comparação</div>`
+      : `<div class="stat" style="grid-column:1/-1"><strong>${localDateLabel(compareDate)}</strong>Não há dados nessa data com os filtros atuais.</div>`;
   } else {
     compareBox.hidden = true;
     compareBox.innerHTML = '';
@@ -321,7 +546,7 @@ function dailySummary(rows, selectedDate, metric, currentContext=null) {
     norm(row.neighborhood) === norm(filters.neighborhood));
   const summary = document.getElementById('neighborhoodSummary');
   if (!selectedRows.length) {
-    summary.innerHTML = `<div class="stat" style="grid-column:1/-1"><strong>${escapeHtml(localDateLabel(selectedDate))}</strong>Selecione um bairro para ver suas métricas diárias.</div>`;
+    summary.innerHTML = `<div class="stat" style="grid-column:1/-1"><strong>${escapeHtml(localDateLabel(selectedDate))}</strong>Escolha um bairro para consultar os dados diários.</div>`;
   } else {
     const medRent = median(selectedRows.map(row => row.median_rent).filter(Number.isFinite));
     const medM2 = median(selectedRows.map(row => row.median_price_m2).filter(Number.isFinite));
@@ -330,14 +555,14 @@ function dailySummary(rows, selectedDate, metric, currentContext=null) {
     const total = field => selectedRows.reduce((sum, row) => sum + (Number(row[field]) || 0), 0);
     summary.innerHTML = `
       ${currentContext ? `<div class="stat"><strong>${fmtNum.format(currentContext.listings.length)}</strong>anúncios do bairro na faixa</div>` : ''}
-      <div class="stat"><strong>${fmtNum.format(total('active'))}</strong>ativos no bairro · sem faixa</div>
+      <div class="stat"><strong>${fmtNum.format(total('active'))}</strong>anúncios ativos no bairro (sem aplicar a faixa de preço)</div>
       <div class="stat"><strong>${medRent == null ? 'sem dado' : fmtBRL.format(medRent)}</strong>mediana do aluguel</div>
       <div class="stat"><strong>${medM2 == null ? 'sem dado' : `${fmtBRL.format(medM2)}/m²`}</strong>mediana do aluguel/m²</div>
-      <div class="stat"><strong>${p25 == null ? 'sem dado' : `${fmtBRL.format(p25)} / ${fmtBRL.format(p75)}`}</strong>P25 / P75 por bairro</div>
+      <div class="stat"><strong>${p25 == null ? 'sem dado' : `${fmtBRL.format(p25)} / ${fmtBRL.format(p75)}`}</strong>P25 / P75 do aluguel/m²</div>
       <div class="stat"><strong>${pct(median(selectedRows.map(row => row.variation_7d).filter(Number.isFinite)))}</strong>variação em 7 dias</div>
       <div class="stat"><strong>${pct(median(selectedRows.map(row => row.variation_30d).filter(Number.isFinite)))}</strong>variação em 30 dias</div>
-      <div class="stat"><strong>${fmtNum.format(total('new'))} / ${fmtNum.format(total('removed'))}</strong>novos / retirados</div>
-      <div class="stat"><strong>${fmtNum.format(total('price_reduced'))} / ${fmtNum.format(total('price_increased'))}</strong>reduções / aumentos</div>`;
+      <div class="stat"><strong>${fmtNum.format(total('new'))} / ${fmtNum.format(total('removed'))}</strong>anúncios novos / retirados</div>
+      <div class="stat"><strong>${fmtNum.format(total('price_reduced'))} / ${fmtNum.format(total('price_increased'))}</strong>anúncios com redução / aumento de preço</div>`;
   }
   if (currentContext) {
     const counts = new Map();
@@ -347,10 +572,24 @@ function dailySummary(rows, selectedDate, metric, currentContext=null) {
       counts.get(key).count++;
     }
     const orderedCounts = [...counts.values()].sort((a,b) => b.count - a.count || a.neighborhood.localeCompare(b.neighborhood, 'pt-BR')).slice(0,14);
-    document.getElementById('rankingLabel').textContent = 'Bairros · anúncios na faixa';
-    document.getElementById('ranking').innerHTML = orderedCounts.map(row =>
-      `<li><span>${escapeHtml(row.neighborhood)} <small>(${escapeHtml(row.city || 'sem cidade')})</small></span><span>${fmtNum.format(row.count)}</span></li>`
-    ).join('') || '<li>Nenhum anúncio nesta faixa e área.</li>';
+    const rankingEl = document.getElementById('ranking');
+    document.getElementById('rankingLabel').textContent = affordabilityRows.length ? 'Bairros mais baratos agora' : 'Anúncios por bairro na faixa';
+    rankingEl.innerHTML = affordabilityRows.length
+      ? affordabilityRows.slice(0,14).map(row => `<li><button type="button" class="ranking-filter-btn" data-neighborhood="${escapeHtml(row.neighborhood)}"><span>${escapeHtml(row.neighborhood)} <small>${escapeHtml(row.city || '')} · ${row.count} ofertas · ${row.propertyType === 'apartment' ? 'apartamentos' : row.propertyType === 'house' ? 'casas' : 'kitnets'}</small></span><span>${fmtBRL.format(row.medianTotal)}/mês · ${pct(row.cityRelative)}</span></button></li>`).join('')
+      : orderedCounts.map(row => `<li><button type="button" class="ranking-filter-btn" data-neighborhood="${escapeHtml(row.neighborhood)}"><span>${escapeHtml(row.neighborhood)} <small>(${escapeHtml(row.city || 'sem cidade')})</small></span><span>${fmtNum.format(row.count)}</span></button></li>`).join('') || '<li>Nenhum anúncio nesta faixa de preço e área.</li>';
+    rankingEl.querySelectorAll('.ranking-filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const nb = btn.dataset.neighborhood;
+        const nbSelect = document.getElementById('dailyNeighborhood');
+        const mainNbSelect = document.getElementById('neighborhoodFilter');
+        if (nbSelect && mainNbSelect) {
+          nbSelect.value = nb;
+          mainNbSelect.value = nb;
+          nbSelect.dispatchEvent(new Event('change'));
+          document.getElementById('dailyPriceTools')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
     return;
   }
   const ordered = [...rows].filter(row => row.neighborhood && row[metric] != null && Number.isFinite(Number(row[metric])))
@@ -360,7 +599,7 @@ function dailySummary(rows, selectedDate, metric, currentContext=null) {
   document.getElementById('rankingLabel').textContent = `Bairros · ${dailyMetricLabels[metric] || metric}`;
   document.getElementById('ranking').innerHTML = ordered.map(row =>
     `<li><span>${escapeHtml(row.neighborhood)} <small>(${fmtNum.format(row.active || 0)} ativos)</small></span><span>${escapeHtml(formatDailyMetric(Number(row[metric]), metric))}</span></li>`
-  ).join('') || '<li>Sem dados para esta data e métrica.</li>';
+  ).join('') || '<li>Não há dados para esta data e métrica.</li>';
 }
 function drawDaily() {
   clearLayers();
@@ -391,20 +630,27 @@ function drawDaily() {
     currentLayers.push(layer);
   } else if (currentView) {
     const range = selectedPriceRange();
-    const listings = currentListings.filter(item => item.available && matchesDailyArea(item, filters)
+    const benchmarks = computeBenchmarks();
+    const baseListings = currentListings.filter(item => item.available && matchesDailyArea(item, filters, true)
       && Number.isFinite(item[range.field]) && !range.invalid
       && (range.min == null || item[range.field] >= range.min)
       && (range.max == null || item[range.field] <= range.max));
+    const enriched = baseListings
+      .map(item => enrichListing(item, benchmarks))
+      .filter(entry => (!filters.onlyBelowMedian || (entry.neighborhoodDiscount != null && entry.neighborhoodDiscount > 0) || (entry.cityDiscount != null && entry.cityDiscount > 0))
+        && (!filters.onlyPriceDrop || entry.drop.dropped));
+    const listings = enriched.map(entry => entry.item);
     plotted = drawCurrentRentalListings(listings, range.field);
     currentContext = {listings, plotted, field:range.field};
     const rangeHelp = document.getElementById('dailyPriceHelp');
-    rangeHelp.textContent = range.invalid ? 'O valor inicial precisa ser menor que o final.'
+    rangeHelp.textContent = range.invalid ? 'O valor mínimo precisa ser menor que o máximo.'
       : `A faixa usa ${priceViews[range.field].label} (${priceViews[range.field].unit}); as cores usam a mesma medida.`;
     rangeHelp.dataset.error = String(range.invalid);
-    renderDailyDeals(listings);
-    if ((range.min != null || range.max != null) && plotted) {
+    const filterKey = JSON.stringify([filters, range]);
+    renderDailyDeals(enriched, filterKey);
+    if ((range.min != null || range.max != null || filters.neighborhood !== 'all') && plotted) {
       const points = listings.filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lon));
-      map.fitBounds(L.latLngBounds(points.map(item => [item.lat, item.lon])), {padding:[32,32], maxZoom:14});
+      if (points.length) map.fitBounds(L.latLngBounds(points.map(item => [item.lat, item.lon])), {padding:[32,32], maxZoom:14});
     }
   } else {
     plotted = drawDailyNeighborhoods(rows, metric);
@@ -414,10 +660,10 @@ function drawDaily() {
   const collectionFailed = publicMeta?.health?.status === 'failed';
   document.getElementById('note').textContent = rows.length
     ? currentView
-      ? `${localDateLabel(selectedDate)} · ${plotted} anúncios da faixa no mapa. Total anunciado = aluguel + condomínio + IPTU informados. A posição fornecida pela fonte pode ser aproximada. Última coleta válida: ${lastSuccess}.`
-      : `${localDateLabel(selectedDate)} · ${plotted} elementos no mapa. Nas datas anteriores, os marcadores representam agregados por bairro; os anúncios individuais aparecem na data mais recente quando a métrica é oferta ativa. Última coleta válida: ${lastSuccess}.`
+      ? `${localDateLabel(selectedDate)} · ${plotted} anúncios dentro da faixa no mapa. O total anunciado soma aluguel, condomínio e IPTU, quando informados. As ofertas e recomendações respeitam o tipo selecionado; as tendências de bairro combinam tipos de imóvel. A localização fornecida pela fonte pode ser aproximada. Última coleta válida: ${lastSuccess}.`
+      : `${localDateLabel(selectedDate)} · ${plotted} marcadores no mapa. Nas datas anteriores, cada marcador resume os dados do bairro; os anúncios individuais aparecem apenas na data mais recente, quando a métrica é “Oferta ativa”. Última coleta válida: ${lastSuccess}.`
     : collectionFailed
-      ? 'A coleta diária não produziu uma base válida. O histórico de 2021 e 2026 continua disponível enquanto a fonte é corrigida.'
+      ? 'Não foi possível validar a coleta diária. O histórico de 2021 e 2026 continua disponível enquanto a fonte é corrigida.'
       : `Sem dados diários para ${localDateLabel(selectedDate)} com os filtros atuais.`;
 }
 return { drawDaily, renderCollectionStatus, localDateLabel };

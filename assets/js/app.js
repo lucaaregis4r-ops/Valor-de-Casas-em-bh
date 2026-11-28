@@ -3,17 +3,17 @@ import { median, percentile, mean, interpolateColor, priceStops, deltaStops, con
 import { norm, selectedFilters, baseFilter, groupByNeighborhood, neighborhoodMedians, cityMedian } from './filters.js';
 import { loadPublicData, currentListings, neighborhoodDaily, listingEvents, publicMeta } from './public-data.js';
 import { neighborhoodNames, neighborhoodSlug, profileLink, renderDirectory, renderProfile, renderComparison } from './neighborhoods.js';
-import { createDailyMarket } from './daily-market.js?v=20261010g';
-import { createMosaic } from './mosaic.js?v=20261010i';
+import { createDailyMarket } from './daily-market.js?v=20261128a';
+import { createMosaic } from './mosaic.js?v=20261114b';
 
 let allPoints = [];
 let allCities = [];
 let allNeighborhoods = [];
 const fmtBRL = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL', maximumFractionDigits:0});
 const fmtNum = new Intl.NumberFormat('pt-BR');
-let mode = 'delta';
-let viewFamily = 'historical';
-let currentView = 'map';
+let mode = '2026';
+let viewFamily = 'daily';
+let currentView = 'agora';
 let names = [];
 let mosaic = null;
 
@@ -55,12 +55,12 @@ function pointTooltip(p, bairroMedian) {
     <strong>${p.neighborhood || 'Sem bairro'}</strong><br>
     Cidade: ${p.city || 'sem cidade'}<br>
     Tipo: ${p.property_type || 'sem tipo'}<br>
-    Preço/m²: <strong>${fmtBRL.format(p.price_m2)}</strong><br>
-    Mediana do bairro: ${medianText}<br>
-    Diferença bairro: <strong>${pct(diff)}</strong><br>
-    Preço total: ${fmtBRL.format(p.price)}<br>
+    Preço pedido por m²: <strong>${fmtBRL.format(p.price_m2)}</strong><br>
+    Mediana do preço pedido no bairro: ${medianText}<br>
+    Diferença em relação à mediana do bairro: <strong>${pct(diff)}</strong><br>
+    Preço total pedido: ${fmtBRL.format(p.price)}<br>
     Área: ${p.area} m²<br>
-    Ano/base: ${p.year}<br>
+    Ano da base: ${p.year}<br>
     ${escapeHtml(p.address || '')}<br>${p.neighborhood ? profileLink(p.neighborhood) : ''}
   `;
 }
@@ -127,8 +127,8 @@ function addGrid(points, relative=false) {
     }).bindTooltip(`
       <strong>Grade espacial</strong><br>
       Imóveis: ${c.n}<br>
-      Mediana preço/m²: ${fmtBRL.format(c.median_m2)}<br>
-      Mediana relativa ao bairro: ${pct(c.median_relative)}
+      Mediana do preço pedido por m²: ${fmtBRL.format(c.median_m2)}<br>
+      Diferença em relação à mediana do bairro: ${pct(c.median_relative)}
     `, {sticky:true}).addTo(layer);
   });
   layer.addTo(map);
@@ -218,17 +218,17 @@ function drawQuadrantDelta() {
       fillColor: color,
       fillOpacity: isLowConfidence ? .30 : .48
     }).bindTooltip(`
-      <strong>Quadrante ${sizeMeters} m</strong><br>
+      <strong>Quadrante de ${sizeMeters} m</strong><br>
       Bairro predominante: ${row.neighborhood || 'sem informação'}<br>
       Cidade: ${row.city || 'sem informação'}<br>
       Imóveis 2021: ${row.n2021}<br>
       Imóveis 2026: ${row.n2026}<br>
-      Preço/m² 2021: ${fmtBRL.format(row.m2021)}<br>
-      Preço/m² 2026: ${fmtBRL.format(row.m2026)}<br>
-      Delta nominal: ${row.deltaNominal >= 0 ? '+' : ''}${fmtBRL.format(row.deltaNominal)}/m²<br>
-      Delta percentual: <strong>${pct(row.deltaPct)}</strong><br>
+      Preço pedido por m² em 2021: ${fmtBRL.format(row.m2021)}<br>
+      Preço pedido por m² em 2026: ${fmtBRL.format(row.m2026)}<br>
+      Variação nominal: ${row.deltaNominal >= 0 ? '+' : ''}${fmtBRL.format(row.deltaNominal)}/m²<br>
+      Variação percentual: <strong>${pct(row.deltaPct)}</strong><br>
       Desvio mediano vs bairro: ${pct(row.relativeMedian)}<br>
-      Confiança: ${row.confidence}
+      Confiabilidade da amostra: ${row.confidence}
     `, {sticky:true}).addTo(layer);
   });
   layer.addTo(map);
@@ -267,10 +267,10 @@ function addLegend(kind) {
   window.legendControl.onAdd = () => {
     const div = L.DomUtil.create('div', 'legend');
     div.innerHTML = kind === 'delta'
-      ? '<strong>Delta nominal preço/m²</strong><div class="bar-delta"></div>Azul queda, laranja alta'
+      ? '<strong>Delta nominal do preço/m²</strong><div class="bar-delta"></div>Azul: queda · laranja: alta'
       : kind === 'condo'
-        ? '<strong>Índice de condominização</strong><div class="bar-condo"></div>Verde baixo, roxo alto'
-        : '<strong>Preço por m²</strong><div class="bar-price"></div>Azul menor, coral maior';
+        ? '<strong>Índice de condominização</strong><div class="bar-condo"></div>Verde: menor · roxo: maior'
+        : '<strong>Preço por m²</strong><div class="bar-price"></div>Azul: menor · coral: maior';
     return div;
   };
   window.legendControl.addTo(map);
@@ -326,13 +326,13 @@ function rentPopup(p, value) {
     <strong>${p.neighborhood || 'Sem bairro'}</strong><br>
     Cidade: ${p.city || 'sem cidade'}<br>
     Tipo: ${p.property_type || 'sem tipo'}<br>
-    Aluguel: ${fmtBRL.format(p.price)}<br>
-    Aluguel/m²: ${fmtBRL.format(p.price_m2)}<br>
+    Aluguel pedido: ${fmtBRL.format(p.price)}<br>
+    Aluguel pedido/m²: ${fmtBRL.format(p.price_m2)}<br>
     Condomínio: ${p.condo_fee == null ? 'não encontrado' : fmtBRL.format(p.condo_fee)}<br>
-    Índice condominização: ${p.condo_fee == null || !p.price ? 'sem dado' : `${((p.condo_fee / p.price) * 100).toFixed(1)}%`}<br>
-    Métrica exibida: <strong>${metricFormat(value)}</strong><br>
+    Índice de condominização: ${p.condo_fee == null || !p.price ? 'sem dado' : `${((p.condo_fee / p.price) * 100).toFixed(1)}%`}<br>
+    Métrica selecionada: <strong>${metricFormat(value)}</strong><br>
     Área: ${p.area} m²<br>
-    Ano/base: 2026 aluguel<br>
+    Base: aluguel 2026<br>
     ${p.address || ''}
   `;
 }
@@ -378,10 +378,10 @@ function drawPrice(year) {
       }).bindTooltip(`${g.name}: ${fmtBRL.format(g.median_m2)}/m²`, {sticky:true})
         .bindPopup(`
       <strong>${escapeHtml(g.name)}</strong><br>
-          Mediana preço/m²: <strong>${fmtBRL.format(g.median_m2)}</strong><br>
-          Mediana preço: ${fmtBRL.format(g.median_price)}<br>
+          Mediana do preço pedido por m²: <strong>${fmtBRL.format(g.median_m2)}</strong><br>
+          Mediana do preço pedido: ${fmtBRL.format(g.median_price)}<br>
           Amostra: ${g.n} imóveis<br>
-          Cor = preço/m²; tamanho = quantidade de anúncios.<br>${profileLink(g.name)}
+          A cor representa o preço/m²; o tamanho, a quantidade de anúncios.<br>${profileLink(g.name)}
         `).addTo(bubbleLayer);
     });
     bubbleLayer.addTo(map);
@@ -506,19 +506,19 @@ function updateRentStats(points) {
   const condoVals = points.map(p => p.condo_fee).filter(v => v !== null && v !== undefined && !Number.isNaN(v));
   const condoIndex = mean(rentVals) && condoVals.length ? mean(condoVals) / mean(rentVals) : null;
   document.getElementById('stats').innerHTML = `
-    <div class="stat"><strong>${fmtNum.format(points.length)}</strong>aluguéis filtrados</div>
-    <div class="stat"><strong>${fmtBRL.format(mean(rentVals) || 0)}</strong>aluguel médio</div>
-    <div class="stat"><strong>${fmtBRL.format(mean(rentM2Vals) || 0)}</strong>aluguel médio/m²</div>
+    <div class="stat"><strong>${fmtNum.format(points.length)}</strong>anúncios de aluguel</div>
+    <div class="stat"><strong>${fmtBRL.format(mean(rentVals) || 0)}</strong>aluguel pedido médio</div>
+    <div class="stat"><strong>${fmtBRL.format(mean(rentM2Vals) || 0)}</strong>aluguel pedido médio/m²</div>
     <div class="stat"><strong>${condoVals.length ? fmtBRL.format(mean(condoVals)) : 'sem dado'}</strong>condomínio médio</div>
-    <div class="stat" style="grid-column:1/-1"><strong>${metricFormat(condoIndex)}</strong>índice de condominização: condomínio médio / aluguel médio</div>`;
+    <div class="stat" style="grid-column:1/-1"><strong>${metricFormat(condoIndex)}</strong>índice de condominização: condomínio médio ÷ aluguel médio</div>`;
   document.getElementById('neighborhoodSummary').innerHTML = '';
   const groups = [...groupByNeighborhood(points).values()].map(g => {
     return {name:g.name, n:g.points.length, avg:aggregateRentMetric(g.points)};
   }).filter(g => g.n >= selectedFilters().minSamples && g.avg !== null).sort((a,b) => b.avg - a.avg).slice(0,14);
   document.getElementById('ranking').innerHTML = groups.map(g => `<li><span>${g.name} <small>(${g.n})</small></span><span>${metricFormat(g.avg)}</span></li>`).join('');
   document.getElementById('note').textContent = isCondoIndex()
-    ? 'Índice de condominização = condomínio médio da área dividido pelo aluguel médio da área. Roxo indica áreas onde o condomínio pesa mais no custo mensal.'
-    : 'Camada de aluguel usa anúncios do QuintoAndar raspados em CSV separado. Condomínio depende do campo estar disponível na página.';
+    ? 'Índice de condominização = condomínio médio ÷ aluguel médio na área. Tons de roxo indicam áreas em que essa proporção é maior.'
+    : 'A camada de aluguel usa anúncios do QuintoAndar coletados à parte. O condomínio entra nos cálculos quando essa informação aparece na página.';
 }
 function drawDelta() {
   clearLayers();
@@ -561,10 +561,10 @@ function drawDelta() {
       }).bindTooltip(`${d.neighborhood}: ${d.delta >= 0 ? '+' : ''}${d.delta.toFixed(1)}%`, {sticky:true})
         .bindPopup(`
           <strong>${escapeHtml(d.neighborhood)}</strong><br>
-          Delta preço/m²: <strong>${d.delta >= 0 ? '+' : ''}${d.delta.toFixed(2)}%</strong><br>
+          Delta no preço pedido/m²: <strong>${d.delta >= 0 ? '+' : ''}${d.delta.toFixed(2)}%</strong><br>
           2021: ${fmtBRL.format(d.m2_2021)}/m², n=${d.n2021}<br>
           2026: ${fmtBRL.format(d.m2_2026)}/m², n=${d.n2026}<br>
-          Tamanho da bolha proporcional ao módulo da mudança.<br>
+          O tamanho da bolha acompanha a intensidade do delta.<br>
           ${profileLink(d.neighborhood)}
         `).addTo(bubbleLayer);
     });
@@ -581,29 +581,31 @@ function updateStats(points, deltas, currentMode, p2021=[], p2026=[]) {
     const up = deltas.filter(d => d.delta > 0).length;
     const down = deltas.filter(d => d.delta < 0).length;
     document.getElementById('stats').innerHTML = `
-      <div class="stat"><strong>${fmtNum.format(points.length)}</strong>pontos 2026 no delta</div>
-      <div class="stat"><strong>${fmtNum.format(deltas.length)}</strong>bairros comparáveis</div>
-      <div class="stat"><strong>${up}</strong>bairros em alta</div>
-      <div class="stat"><strong>${down}</strong>bairros em queda</div>`;
+      <div class="stat"><strong>${fmtNum.format(points.length)}</strong>imóveis de 2026 na comparação</div>
+      <div class="stat"><strong>${fmtNum.format(deltas.length)}</strong>bairros comparados</div>
+      <div class="stat"><strong>${up}</strong>bairros com alta no preço pedido</div>
+      <div class="stat"><strong>${down}</strong>bairros com queda no preço pedido</div>`;
     const gains = [...deltas].filter(d => d.delta > 0).sort((a,b) => b.delta - a.delta).slice(0, 7);
     const declines = [...deltas].filter(d => d.delta < 0).sort((a,b) => a.delta - b.delta).slice(0, 7);
-    document.getElementById('rankingLabel').textContent = 'Onde mais valorizou';
+    document.getElementById('rankingLabel').textContent = 'Maiores altas no preço pedido';
     document.getElementById('ranking').innerHTML = gains.map(d => `<li><span><a href="#/bairro/${neighborhoodSlug(d.neighborhood)}">${escapeHtml(d.neighborhood)}</a></span><span class="pos">+${d.delta.toFixed(1)}%</span></li>`).join('');
     document.getElementById('rankingDeclines').hidden = !declines.length;
     document.getElementById('declineList').innerHTML = declines.map(d => `<li><span><a href="#/bairro/${neighborhoodSlug(d.neighborhood)}">${escapeHtml(d.neighborhood)}</a></span><span class="neg">${d.delta.toFixed(1)}%</span></li>`).join('');
-    document.getElementById('note').textContent = 'Delta calculado pela mediana do preço/m² por bairro. Para comparação mais justa, use Tipo = Apartamentos.';
+    document.getElementById('note').textContent = 'A variação compara a mediana do preço pedido por m² em cada bairro. Para comparar apartamentos, selecione “Apartamentos” em Tipo de imóvel.';
   } else {
     document.getElementById('rankingDeclines').hidden = true;
     document.getElementById('stats').innerHTML = `
       <div class="stat"><strong>${fmtNum.format(points.length)}</strong>imóveis filtrados</div>
-      <div class="stat"><strong>${fmtBRL.format(medM2 || 0)}</strong>mediana preço/m²</div>
-      <div class="stat"><strong>${fmtBRL.format(medPrice || 0)}</strong>mediana preço</div>
+      <div class="stat"><strong>${fmtBRL.format(medM2 || 0)}</strong>mediana do preço pedido por m²</div>
+      <div class="stat"><strong>${fmtBRL.format(medPrice || 0)}</strong>mediana do preço pedido</div>
       <div class="stat"><strong>${currentMode}</strong>ano exibido</div>`;
     const groups = groupByNeighborhood(points);
     const ranking = [...groups.values()].map(g => ({name:g.name, n:g.points.length, m2:median(g.points.map(p => p.price_m2))}))
       .filter(g => g.n >= 5).sort((a,b) => b.m2 - a.m2).slice(0,14);
     document.getElementById('ranking').innerHTML = ranking.map(g => `<li><span>${g.name} <small>(${g.n})</small></span><span>${fmtBRL.format(g.m2)}</span></li>`).join('');
-    document.getElementById('note').textContent = currentMode === 2021 ? 'A base 2021 foi tratada como apartamentos, pois não tem coluna de tipo.' : 'A base 2026 vem de anúncios de venda do QuintoAndar.';
+    document.getElementById('note').textContent = currentMode === 2021
+      ? 'A base de 2021 não informa o tipo de imóvel; por isso, foi considerada uma base de apartamentos.'
+      : 'A base de 2026 reúne anúncios de venda do QuintoAndar.';
   }
 }
 function pctl(values, fraction) {
@@ -618,7 +620,7 @@ function updateNeighborhoodSummary(points, currentMode) {
   }
   const selected = points.filter(p => p.neighborhood === f.neighborhood);
   if (selected.length < f.minSamples) {
-    box.innerHTML = `<div class="stat" style="grid-column:1/-1"><strong>${selected.length}</strong>Amostra insuficiente para análise confiável neste bairro.</div>`;
+    box.innerHTML = `<div class="stat" style="grid-column:1/-1"><strong>${selected.length}</strong>A amostra deste bairro não é suficiente para uma análise confiável.</div>`;
     return;
   }
   const values = selected.map(p => p.price_m2).sort((a,b) => a-b);
@@ -640,20 +642,20 @@ function updateNeighborhoodSummary(points, currentMode) {
   const delta = deltaData().deltas.get(norm(f.neighborhood));
   box.innerHTML = `
     <div class="stat"><strong>${fmtNum.format(selected.length)}</strong>imóveis no bairro</div>
-    <div class="stat"><strong>${fmtBRL.format(med)}</strong>mediana preço/m²</div>
-    <div class="stat"><strong>${fmtBRL.format(avg)}</strong>média preço/m²</div>
-    <div class="stat"><strong>${fmtBRL.format(min)}</strong>menor preço/m²</div>
-    <div class="stat"><strong>${fmtBRL.format(max)}</strong>maior preço/m²</div>
+    <div class="stat"><strong>${fmtBRL.format(med)}</strong>mediana do preço pedido por m²</div>
+    <div class="stat"><strong>${fmtBRL.format(avg)}</strong>média do preço pedido por m²</div>
+    <div class="stat"><strong>${fmtBRL.format(min)}</strong>menor preço pedido por m²</div>
+    <div class="stat"><strong>${fmtBRL.format(max)}</strong>maior preço pedido por m²</div>
     <div class="stat"><strong>${fmtBRL.format(p25)} / ${fmtBRL.format(p75)}</strong>P25 / P75</div>
-    <div class="stat"><strong>${fmtBRL.format(max - min)}</strong>amplitude interna</div>
-    <div class="stat"><strong>${pct(cityDiff)}</strong>vs mediana da cidade</div>
-    <div class="stat" style="grid-column:1/-1"><strong>${delta ? pct(delta.delta / 100) : 'sem delta'}</strong>delta 2021-2026 no bairro</div>
+    <div class="stat"><strong>${fmtBRL.format(max - min)}</strong>diferença entre maior e menor preço/m²</div>
+    <div class="stat"><strong>${pct(cityDiff)}</strong>em relação à mediana da cidade</div>
+    <div class="stat" style="grid-column:1/-1"><strong>${delta ? pct(delta.delta / 100) : 'sem comparação'}</strong>variação entre 2021 e 2026 no bairro</div>
   `;
 }
 function updateQuadrantStats(rows) {
   const box = document.getElementById('neighborhoodSummary');
   if (!rows.length) {
-    box.innerHTML = `<div class="stat" style="grid-column:1/-1"><strong>0</strong>Nenhum quadrante com amostra suficiente para o filtro atual.</div>`;
+    box.innerHTML = `<div class="stat" style="grid-column:1/-1"><strong>0</strong>Nenhum quadrante tem amostra suficiente para os filtros atuais.</div>`;
     return;
   }
   const deltas = rows.map(r => r.deltaPct);
@@ -664,9 +666,9 @@ function updateQuadrantStats(rows) {
   const worst = [...rows].sort((a,b) => a.deltaPct - b.deltaPct)[0];
   box.innerHTML = `
     <div class="stat"><strong>${rows.length}</strong>quadrantes exibidos</div>
-    <div class="stat"><strong>${pct(median(deltas))}</strong>delta mediano</div>
-    <div class="stat"><strong>${up}</strong>quadrantes em alta</div>
-    <div class="stat"><strong>${down}</strong>quadrantes em queda</div>
+    <div class="stat"><strong>${pct(median(deltas))}</strong>variação mediana</div>
+    <div class="stat"><strong>${up}</strong>quadrantes com alta no preço pedido</div>
+    <div class="stat"><strong>${down}</strong>quadrantes com queda no preço pedido</div>
     <div class="stat"><strong>${stable}</strong>quadrantes estáveis</div>
     <div class="stat"><strong>${best.neighborhood || '-'}</strong>maior alta: ${pct(best.deltaPct)}</div>
     <div class="stat" style="grid-column:1/-1"><strong>${worst.neighborhood || '-'}</strong>maior queda: ${pct(worst.deltaPct)}</div>
@@ -677,31 +679,39 @@ const { drawDaily, renderCollectionStatus, localDateLabel } = createDailyMarket(
 
 function redraw() {
   const historical = viewFamily === 'historical';
+  const currentRent = viewFamily === 'current';
   document.getElementById('rankingDeclines').hidden = true;
-  document.getElementById('historicalControls').hidden = !historical;
+  document.getElementById('historicalControls').hidden = !(historical || currentRent);
   document.getElementById('historicalControlsDetails').hidden = !historical;
-  document.getElementById('dailyControls').hidden = historical;
-  document.getElementById('typeFilterWrap').hidden = !historical;
+  document.getElementById('dailyControls').hidden = viewFamily !== 'daily';
+  document.getElementById('typeFilterWrap').hidden = false;
   document.getElementById('rentMetricWrap').hidden = !historical || mode !== 'rent';
-  document.getElementById('dailyDateWrap').hidden = historical;
-  document.getElementById('dailyCompareWrap').hidden = historical;
+  document.getElementById('dailyDateWrap').hidden = viewFamily !== 'daily';
+  document.getElementById('dailyCompareWrap').hidden = viewFamily !== 'daily';
+  document.getElementById('dailyPriceTools').hidden = !currentRent && viewFamily !== 'daily';
+  document.getElementById('dailyDeals').hidden = !currentRent && viewFamily !== 'daily';
+  document.getElementById('collectionStatus').hidden = !currentRent && viewFamily !== 'daily';
+  document.getElementById('auxToolsCallout').hidden = currentView !== 'agora';
+  document.querySelectorAll('.historical-picks button').forEach(button => button.classList.remove('active'));
+  const activeModeButton = document.getElementById(`mode${mode[0].toUpperCase()}${mode.slice(1)}`);
+  if (activeModeButton) activeModeButton.classList.add('active');
   document.getElementById('mapSourceLabel').textContent = historical
-    ? mode === 'rent' ? 'ATLAS · ALUGUEL DA BASE 2026' : 'ATLAS · BASES HISTÓRICAS 2021 E 2026'
-    : 'MERCADO AGORA · COLETAS DE ALUGUEL';
+    ? mode === 'rent' ? 'Aluguel histórico, base 2026' : 'Atlas histórico, bases 2021 e 2026'
+    : currentRent ? 'Aluguéis ativos · coleta mais recente' : 'Mercado Agora · coleta mais recente';
   document.getElementById('mapCaption').textContent = historical
-    ? 'Dados históricos consolidados de anúncios. Preços pedidos não equivalem a transações.'
-    : 'Anúncios de aluguel observados nas coletas. Variações recentes podem refletir mudança na oferta.';
-  if (!historical) {
-    document.getElementById('rankingLabel').textContent = 'Bairros · mercado diário';
+    ? 'Os valores são preços pedidos em anúncios, não valores de transação.'
+    : 'Anúncios de aluguel observados nas coletas. O total mensal soma aluguel, condomínio e IPTU informados.';
+  if (!historical || currentRent) {
+    if (currentRent) document.getElementById('dailyMetric').value = 'active';
+    document.getElementById('rankingLabel').textContent = 'Bairros mais baratos agora';
     drawDaily();
     return;
   }
-  document.getElementById('rankingLabel').textContent = mode === 'delta' ? 'Onde mais valorizou' : 'Bairros em destaque';
-  document.querySelectorAll('.buttons button').forEach(b => b.classList.remove('active'));
-  if (mode === '2021') { document.getElementById('mode2021').classList.add('active'); drawPrice(2021); }
-  if (mode === '2026') { document.getElementById('mode2026').classList.add('active'); drawPrice(2026); }
-  if (mode === 'delta') { document.getElementById('modeDelta').classList.add('active'); drawDelta(); }
-  if (mode === 'rent') { document.getElementById('modeRent').classList.add('active'); drawRent(); }
+  document.getElementById('rankingLabel').textContent = mode === 'delta' ? 'Maiores altas no preço pedido' : 'Bairros em destaque';
+  if (mode === '2021') drawPrice(2021);
+  if (mode === '2026') drawPrice(2026);
+  if (mode === 'delta') drawDelta();
+  if (mode === 'rent') drawRent();
 }
 function fillSelects() {
   const publishedCities = [
@@ -716,23 +726,85 @@ function fillSelects() {
   ];
   allCities = [...new Set([...allCities, ...publishedCities].filter(Boolean))].sort((a,b) => a.localeCompare(b, 'pt-BR'));
   allNeighborhoods = [...new Set([...allNeighborhoods, ...publishedNeighborhoods].filter(Boolean))].sort((a,b) => a.localeCompare(b, 'pt-BR'));
-  const city = document.getElementById('cityFilter');
-  city.replaceChildren(new Option('Todas', 'all'), ...allCities.map(name => new Option(name, name)));
-  city.value = allCities.includes('Belo Horizonte') ? 'Belo Horizonte' : 'all';
-  const nb = document.getElementById('neighborhoodFilter');
-  nb.replaceChildren(new Option('Todos', 'all'), ...allNeighborhoods.map(name => new Option(name, name)));
+  const defaultCity = allCities.includes('Belo Horizonte') ? 'Belo Horizonte' : 'all';
+  for (const id of ['cityFilter', 'dailyCity']) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.replaceChildren(new Option('Todas', 'all'), ...allCities.map(name => new Option(name, name)));
+    el.value = defaultCity;
+  }
+  for (const id of ['neighborhoodFilter', 'dailyNeighborhood']) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.replaceChildren(new Option('Todos', 'all'), ...allNeighborhoods.map(name => new Option(name, name)));
+    el.value = 'all';
+  }
+  const typeEl = document.getElementById('typeFilter');
+  const dailyTypeEl = document.getElementById('dailyType');
+  if (typeEl && dailyTypeEl) {
+    typeEl.value = 'all';
+    dailyTypeEl.value = 'all';
+  }
   names = neighborhoodNames(allPoints.filter(p => p.city === 'Belo Horizonte'),
     currentListings.filter(p => p.city === 'Belo Horizonte'));
   document.getElementById('compareNeighborhoods').replaceChildren(...names.map(name => new Option(name, name)));
   renderDirectory(names);
   renderComparison(allPoints);
 }
+function syncFilterPair(sourceId, targetId) {
+  const source = document.getElementById(sourceId);
+  const target = document.getElementById(targetId);
+  if (!source || !target) return;
+  source.addEventListener('change', () => {
+    target.value = source.value;
+    redraw();
+  });
+}
 function bindControls() {
-  document.getElementById('mode2021').onclick = () => {mode='2021'; redraw();};
-  document.getElementById('mode2026').onclick = () => {mode='2026'; redraw();};
-  document.getElementById('modeDelta').onclick = () => {mode='delta'; redraw();};
-  document.getElementById('modeRent').onclick = () => {mode='rent'; redraw();};
-  ['typeFilter','cityFilter','neighborhoodFilter','minSamples','deltaStyle','priceStyle','cellSize','rentMetric','dailyMetric'].forEach(id => document.getElementById(id).addEventListener('change', redraw));
+  document.getElementById('mode2021').onclick = () => {mode='2021'; viewFamily='historical'; redraw();};
+  document.getElementById('mode2026').onclick = () => {mode='2026'; viewFamily='historical'; redraw();};
+  document.getElementById('modeDelta').onclick = () => {mode='delta'; viewFamily='historical'; redraw();};
+  document.getElementById('modeRent').onclick = () => {mode='rent'; viewFamily='historical'; redraw();};
+  document.getElementById('modeCurrent').onclick = () => {mode='current'; viewFamily='current'; redraw();};
+  ['minSamples','deltaStyle','priceStyle','cellSize','rentMetric','dailyMetric','dailyRooms','dailyMinArea'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', redraw);
+  });
+  syncFilterPair('cityFilter', 'dailyCity');
+  syncFilterPair('dailyCity', 'cityFilter');
+  syncFilterPair('neighborhoodFilter', 'dailyNeighborhood');
+  syncFilterPair('dailyNeighborhood', 'neighborhoodFilter');
+  syncFilterPair('typeFilter', 'dailyType');
+  syncFilterPair('dailyType', 'typeFilter');
+
+  const searchForm = document.getElementById('dailySearchForm');
+  if (searchForm) searchForm.addEventListener('submit', e => { e.preventDefault(); redraw(); });
+
+  const maxChips = { max1500: '1500', max2000: '2000', max2500: '2500' };
+  document.querySelectorAll('.quick-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const chip = btn.dataset.chip;
+      const nextPressed = btn.getAttribute('aria-pressed') !== 'true';
+      btn.setAttribute('aria-pressed', String(nextPressed));
+      if (maxChips[chip]) {
+        document.querySelectorAll('.quick-chip').forEach(other => {
+          if (other !== btn && maxChips[other.dataset.chip]) other.setAttribute('aria-pressed', 'false');
+        });
+        const priceView = document.getElementById('dailyPriceView');
+        if (nextPressed && priceView.value === 'price_m2') {
+          priceView.value = 'total_price';
+          document.getElementById('dailyPriceMin').value = '';
+          document.getElementById('dailyPriceMin').step = '100';
+          document.getElementById('dailyPriceMax').step = '100';
+          document.getElementById('dailyPriceMin').placeholder = 'R$ mínimo';
+          document.getElementById('dailyPriceMax').placeholder = 'R$ máximo';
+        }
+        document.getElementById('dailyPriceMax').value = nextPressed ? maxChips[chip] : '';
+      }
+      redraw();
+    });
+  });
+
   let previousPriceView = document.getElementById('dailyPriceView').value;
   document.getElementById('dailyPriceView').addEventListener('change', () => {
     const nextPriceView = document.getElementById('dailyPriceView').value;
@@ -759,6 +831,13 @@ function bindControls() {
   document.getElementById('dailyPriceClear').addEventListener('click', () => {
     document.getElementById('dailyPriceMin').value = '';
     document.getElementById('dailyPriceMax').value = '';
+    document.getElementById('dailyRooms').value = '0';
+    document.getElementById('dailyMinArea').value = '0';
+    document.getElementById('dailyType').value = 'all';
+    document.getElementById('typeFilter').value = 'all';
+    document.getElementById('dailyNeighborhood').value = 'all';
+    document.getElementById('neighborhoodFilter').value = 'all';
+    document.querySelectorAll('.quick-chip').forEach(btn => btn.setAttribute('aria-pressed', 'false'));
     redraw();
   });
   document.getElementById('radius').addEventListener('input', redraw);
@@ -775,10 +854,19 @@ function bindControls() {
 }
 
 function navigate() {
-  const route = decodeURIComponent(location.hash.replace(/^#\/?/, '') || 'map');
+  const route = decodeURIComponent(location.hash.replace(/^#\/?/, '') || 'agora');
   const profile = route.startsWith('bairro/');
-  currentView = profile ? 'bairro' : ['map', 'atlas', 'agora', 'bairros', 'metodologia'].includes(route) ? route : 'map';
+  currentView = profile ? 'bairro' : ['map', 'atlas', 'agora', 'bairros', 'metodologia'].includes(route) ? route : 'agora';
   const explore = ['map', 'atlas', 'agora'].includes(currentView);
+  const titles = {
+    agora: 'Mercado Agora · Imóveis baratos | Moradia BH',
+    map: 'Mosaico Metropolitano | Moradia BH',
+    atlas: 'Atlas Histórico (2021–2026) | Moradia BH',
+    bairros: 'Bairros de BH | Moradia BH',
+    metodologia: 'Metodologia | Moradia BH',
+    bairro: `${route.slice(7)} · Perfil do bairro | Moradia BH`
+  };
+  document.title = titles[currentView] || 'Moradia BH | Buscador de imóveis baratos';
   document.getElementById('exploreView').hidden = !explore;
   document.getElementById('bairrosView').hidden = currentView !== 'bairros';
   document.getElementById('profileView').hidden = !profile;
@@ -795,31 +883,35 @@ function navigate() {
     const home = currentView === 'map';
     const daily = currentView === 'agora';
     document.querySelector('.map-controls').classList.toggle('mosaic-mode', home);
-    viewFamily = daily ? 'daily' : 'historical';
+    viewFamily = daily ? 'daily' : currentView === 'atlas' && mode === 'current' ? 'current' : 'historical';
     document.getElementById('homeChoices').hidden = !home;
     document.getElementById('mosaicControls').hidden = !home;
     document.getElementById('mosaicAreaBar').hidden = !home;
     document.getElementById('mosaicDetail').hidden = !home;
-    document.getElementById('dailyPriceTools').hidden = !daily;
-    document.getElementById('dailyDeals').hidden = !daily;
+    const currentRent = viewFamily === 'current';
+    document.getElementById('dailyPriceTools').hidden = !(daily || currentRent);
+    document.getElementById('dailyDeals').hidden = !(daily || currentRent);
     document.getElementById('historicalControls').hidden = home || daily;
     document.getElementById('dailyControls').hidden = !daily;
     document.getElementById('configToggle').hidden = home;
     document.getElementById('configPanel').hidden = home || document.getElementById('configToggle').getAttribute('aria-expanded') !== 'true';
     document.getElementById('analysisSection').hidden = home;
     document.getElementById('comparisonSection').hidden = currentView !== 'atlas';
-    document.getElementById('collectionStatus').hidden = !daily;
-    document.getElementById('viewKicker').textContent = daily ? '02 / COLETAS RECENTES' : home ? 'CARTOGRAFIA DO MORAR · REGIÃO METROPOLITANA DE BH' : '01 / ATLAS HISTÓRICO';
-    document.getElementById('viewTitle').textContent = daily ? 'Mercado Agora' : home ? 'O custo de morar, no mapa.' : 'Atlas do morar';
+    document.getElementById('collectionStatus').hidden = !(daily || currentRent);
+    document.getElementById('auxToolsCallout').hidden = !daily;
+    document.getElementById('viewKicker').textContent = daily ? '01 / PRINCIPAL · BUSCADOR DE ALUGUÉIS BARATOS' : home ? 'FERRAMENTA AUXILIAR · MOSAICO METROPOLITANO' : currentRent ? 'FERRAMENTA AUXILIAR · ALUGUEL E HISTÓRICO' : 'FERRAMENTA AUXILIAR · ATLAS HISTÓRICO';
+    document.getElementById('viewTitle').textContent = daily ? 'Encontre imóveis baratos agora.' : home ? 'Mosaico de preços por região.' : currentRent ? 'Aluguel agora e histórico' : 'Atlas histórico (2021–2026)';
     document.getElementById('viewIntro').textContent = daily
-      ? 'Acompanhe os anúncios de aluguel observados nas coletas, a oferta e seus movimentos recentes.'
-      : home ? 'Escolha venda ou aluguel, compare o preço por m² ou o valor total e abra uma cidade. Em BH, Contagem, Betim e Nova Lima, você também pode entrar em um bairro para ver suas regiões.'
-        : 'Compare os preços pedidos de venda de 2021 e 2026, bairro a bairro.';
-    document.getElementById('analysisEyebrow').textContent = daily ? 'OFERTA OBSERVADA' : 'LEITURA HISTÓRICA';
-    document.getElementById('analysisTitle').textContent = daily ? 'Resumo da coleta selecionada' : 'Panorama da área selecionada';
-    document.getElementById('dailyMetric').value = daily && document.getElementById('dailyMetric').value === 'median_price_m2' ? 'active' : document.getElementById('dailyMetric').value;
-    document.getElementById('mapAreaLabel').textContent = home ? 'Clique numa cidade para ver suas regiões' : 'Belo Horizonte e região metropolitana';
-    document.getElementById('mapInteractionHint').textContent = home ? 'Clique numa cidade · escolha o período acima · explore as regiões' : 'Arraste para explorar · clique nos pontos para detalhes';
+      ? 'Compare anúncios ativos de aluguel em BH e região pelo custo total mensal (aluguel, condomínio e IPTU) e descubra ofertas abaixo da mediana do bairro.'
+      : home ? 'Ferramenta auxiliar para consultar a grade metropolitana por cidade, bairro ou região.'
+        : currentRent ? 'Compare os aluguéis ativos com as coletas anteriores e consulte as bases históricas de venda.'
+        : 'Ferramenta auxiliar para comparar, por bairro, os preços de venda anunciados em 2021 e 2026.';
+    document.getElementById('analysisEyebrow').textContent = daily ? 'PANORAMA DO MERCADO' : currentRent ? 'TENDÊNCIA E PREÇO RELATIVO' : 'DADOS HISTÓRICOS';
+    document.getElementById('analysisTitle').textContent = daily ? 'Resumo da busca e coleta' : currentRent ? 'O aluguel está subindo? Está caro para a região?' : 'Panorama da área selecionada';
+    if (daily && !document.getElementById('dailyMetric').value) document.getElementById('dailyMetric').value = 'active';
+    if (currentRent) document.getElementById('dailyMetric').value = 'active';
+    document.getElementById('mapAreaLabel').textContent = home ? 'Selecione uma cidade para ver as regiões' : 'Belo Horizonte e região metropolitana';
+    document.getElementById('mapInteractionHint').textContent = home ? 'Selecione uma cidade, escolha o período e veja os dados por região.' : 'Arraste o mapa para mudar a área visível. Selecione um ponto para ver os dados.';
     if (home) mosaic.show();
     else { mosaic.hide(); redraw(); }
     requestAnimationFrame(() => map.invalidateSize());
@@ -858,13 +950,13 @@ async function initializeApp() {
     compareInput.max = dates.at(-1);
     compareInput.value = '';
     compareInput.disabled = dates.length < 2;
-    if (dates.length < 2) document.getElementById('compareHelp').textContent = 'Aguardando novas coletas para comparar datas.';
+    if (dates.length < 2) document.getElementById('compareHelp').textContent = 'Ainda não há duas datas para comparar.';
     document.getElementById('dailyDateStart').textContent = localDateLabel(dates[0]);
     document.getElementById('dailyDateEnd').textContent = localDateLabel(dates.at(-1));
   } else {
     dateInput.disabled = true;
     document.getElementById('dailyCompareDate').disabled = true;
-    document.getElementById('dailyDateStart').textContent = 'Sem histórico';
+    document.getElementById('dailyDateStart').textContent = 'Ainda não há coletas';
     document.getElementById('dailyDateEnd').textContent = '';
   }
   for (const metric of ['variation_7d', 'variation_30d']) {
@@ -880,5 +972,5 @@ async function initializeApp() {
 
 initializeApp().catch(error => {
   console.error('Não foi possível carregar as bases do mapa.', error);
-  document.getElementById('note').textContent = 'Não foi possível carregar os dados do mapa. Tente recarregar a página.';
+  document.getElementById('note').textContent = 'Não foi possível carregar os dados do mapa. Recarregue a página para tentar novamente.';
 });

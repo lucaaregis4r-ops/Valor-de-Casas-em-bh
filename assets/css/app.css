@@ -1,7 +1,15 @@
-:root{--ink:#173432;--muted:#59716b;--forest:#0e5048;--moss:#dbece4;--paper:#f5f5ee;--line:#b9c8bd;--accent:#d18a39;--blue:#315e9b}
+/* Hallmark · shape: app screen · genre: modern-minimal (inferred) · theme: custom · redesign: restyle
+ * idea: "Let the neighborhood mosaic lead" · vibe: "territorial, mineral, editorial, local, legible"
+ * paper: light · accent: warm ochre · display: Archivo Narrow · body: Instrument Sans
+ * nav: kept · signature: municipal mosaic · states: data, selection, drilldown, loading, empty
+ * axes: light/display-condensed/warm · posture: map-first · contrast: pending · v2.0.0 */
+/* Hallmark · critique: map leads, controls flatten, Belo Horizonte remains legible through its real geography. */
+@import url("./tokens.css");
+@import url("./base.css");
+:root{--ink:#173432;--muted:#59716b;--forest:#0e5048;--moss:#dbece4;--paper:#eff3ee;--line:#b9c8bd;--accent:#d18a39;--blue:#315e9b}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:var(--paper);font-family:"Instrument Sans",sans-serif}button,input,select{font:inherit}[hidden]{display:none!important}a{color:inherit}button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .site-header{display:flex;align-items:center;justify-content:space-between;gap:2rem;min-height:80px;padding:12px clamp(18px,4vw,68px);border-bottom:1px solid var(--line);background:#f8faf4}
-.brand{display:flex;align-items:center;gap:12px;text-decoration:none;white-space:nowrap}.brand>span:last-child{display:grid}.brand strong{font-family:"Archivo Narrow",sans-serif;font-size:24px;letter-spacing:.02em;line-height:1}.brand em{color:var(--forest);font-style:normal}.brand small{margin-top:3px;color:var(--muted);font-size:10px;letter-spacing:.11em;text-transform:uppercase}.brand-mark{position:relative;display:block;width:40px;height:40px;border:2px solid var(--forest);transform:rotate(-8deg);overflow:hidden}.brand-mark i{position:absolute;width:42px;height:15px;border-top:2px solid var(--forest);border-radius:50%;transform:rotate(-22deg)}.brand-mark i:nth-child(1){top:8px;left:-4px}.brand-mark i:nth-child(2){top:18px;left:-8px}.brand-mark i:nth-child(3){top:29px;left:-4px}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;white-space:nowrap}.brand>span:last-child{display:grid}.brand strong{font-family:"Archivo Narrow",sans-serif;font-size:24px;letter-spacing:.02em;line-height:1}.brand em{color:var(--forest);font-style:normal}.brand small{margin-top:3px;color:var(--muted);font-size:11px;letter-spacing:.11em;text-transform:uppercase}.brand-mark{position:relative;display:block;width:40px;height:40px;border:2px solid var(--forest);transform:rotate(-8deg);overflow:hidden}.brand-mark i{position:absolute;width:42px;height:15px;border-top:2px solid var(--forest);border-radius:50%;transform:rotate(-22deg)}.brand-mark i:nth-child(1){top:8px;left:-4px}.brand-mark i:nth-child(2){top:18px;left:-8px}.brand-mark i:nth-child(3){top:29px;left:-4px}
 .primary-nav{display:flex;align-items:center;gap:clamp(12px,2vw,36px);overflow-x:auto;scrollbar-width:none}.primary-nav a{flex:none;padding:14px 0 11px;border-bottom:3px solid transparent;color:#425e58;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap}.primary-nav a:hover,.primary-nav a.active{color:var(--forest);border-color:var(--accent)}
 main{min-height:calc(100vh - 80px)}.explore-view{max-width:1800px;margin:auto;padding:28px clamp(18px,4vw,68px) 80px}.page-heading{display:flex;justify-content:space-between;align-items:end;gap:30px;margin-bottom:24px}.overline,.section-heading>span,.block-head>span,.method-grid span{margin:0 0 8px;color:var(--forest);font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase}h1,h2,h3,p{margin-top:0}h1,h2,.home-choices strong,.list li,.profile-stat strong{font-family:"Archivo Narrow",sans-serif}h1{max-width:900px;margin-bottom:8px;font-size:clamp(40px,5.6vw,80px);font-weight:600;letter-spacing:-.025em;line-height:.98}.lead{max-width:720px;margin-bottom:0;color:#516860;font-size:clamp(14px,1.3vw,17px);line-height:1.55}
 .status-banner{display:flex;align-items:start;gap:10px;max-width:270px;padding:11px 13px;border-top:2px solid var(--accent);color:var(--ink);background:#eaf1e9}.status-banner strong,.status-banner small{display:block}.status-banner strong{font-size:12px}.status-banner small{margin-top:4px;color:var(--muted);font-size:10px;line-height:1.4}.status-dot{flex:0 0 8px;height:8px;margin-top:4px;border-radius:50%;background:var(--accent)}.status-banner[data-state=success] .status-dot{background:#368761}.status-banner[data-state=failed] .status-dot{background:#b5473d}
@@ -42,3 +50,112 @@ select,input[type=date],input[type=search]{min-height:38px;padding:7px 10px;bord
 @media(max-width:720px){.mosaic-area-bar .mosaic-value-summary{max-width:none;width:100%}}
 @media(max-width:600px){.mosaic-controls,.mosaic-controls.has-neighborhoods{grid-template-columns:1fr;gap:6px}.mosaic-control-field{padding:9px 11px}.mosaic-area-bar>div>span{font-size:22px}}
 .mosaic-area-bar .mosaic-breadcrumb button:hover{background:none;color:var(--forest)}.mosaic-area-bar .mosaic-breadcrumb button:disabled:hover{color:var(--muted)}
+
+body:has(.map-controls.mosaic-mode){background:var(--color-paper)}
+body:has(.map-controls.mosaic-mode) .site-header{min-height:72px;padding:var(--space-xs) clamp(var(--space-md),4vw,var(--space-2xl));border-color:var(--color-rule);background:var(--color-paper)}
+body:has(.map-controls.mosaic-mode) .primary-nav a{color:var(--color-ink-2);font-size:14px}
+body:has(.map-controls.mosaic-mode) .primary-nav a:hover,body:has(.map-controls.mosaic-mode) .primary-nav a.active{color:var(--color-ink);border-color:var(--color-accent)}
+body:has(.map-controls.mosaic-mode) .explore-view{max-width:1640px;padding:var(--space-md) clamp(var(--space-md),4vw,var(--space-2xl)) var(--space-2xl);color:var(--color-ink)}
+body:has(.map-controls.mosaic-mode) .page-heading{display:block;margin-bottom:16px}
+body:has(.map-controls.mosaic-mode) .page-heading>div:first-child{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(280px,.7fr);align-items:end;column-gap:clamp(var(--space-lg),5vw,72px)}
+body:has(.map-controls.mosaic-mode) #viewKicker{display:none}
+body:has(.map-controls.mosaic-mode) #viewTitle{grid-column:1;grid-row:1;max-width:none;margin:0;color:var(--color-ink);font-size:clamp(42px,4.6vw,64px);font-weight:600;letter-spacing:-.025em;line-height:.98;text-wrap:balance}
+body:has(.map-controls.mosaic-mode) #viewIntro{grid-column:2;grid-row:1;max-width:48ch;margin:0;padding-inline-start:var(--space-lg);border-inline-start:1px solid var(--color-rule);color:var(--color-muted);font-size:15px;line-height:1.55}
+body:has(.map-controls.mosaic-mode) .map-controls.mosaic-mode{margin:0;padding:var(--space-sm) 0;border-block:1px solid var(--color-rule)}
+body:has(.map-controls.mosaic-mode) .map-controls.mosaic-mode .control-main{display:block;width:100%;flex-basis:100%}
+body:has(.map-controls.mosaic-mode) .map-controls.mosaic-mode .control-caption{display:none}
+body:has(.map-controls.mosaic-mode) .mosaic-controls,body:has(.map-controls.mosaic-mode) .mosaic-controls.has-neighborhoods{grid-template-columns:minmax(0,1.15fr) minmax(0,.8fr) minmax(0,1fr);gap:var(--space-md);width:100%}
+body:has(.map-controls.mosaic-mode) .mosaic-control-field{gap:var(--space-2xs);min-width:0;padding:0;border:0;background:transparent}
+body:has(.map-controls.mosaic-mode) .mosaic-control-field label{min-height:20px;color:var(--color-ink-2);font-size:12px;font-weight:600;letter-spacing:0;text-transform:none}
+body:has(.map-controls.mosaic-mode) .mosaic-control-field label b{display:none}
+body:has(.map-controls.mosaic-mode) .mosaic-control-field select{width:100%;min-width:0;min-height:44px;padding:var(--space-xs) 32px var(--space-xs) var(--space-sm);border:1px solid var(--color-rule);border-radius:3px;background:var(--color-paper-2);color:var(--color-ink);font-size:15px;cursor:pointer;transition:background-color 140ms,border-color 140ms}
+body:has(.map-controls.mosaic-mode) .mosaic-control-field select:hover{border-color:var(--color-ink-2);background:var(--color-paper-3)}
+body:has(.map-controls.mosaic-mode) .mosaic-area-bar{align-items:center;gap:var(--space-lg);margin:0;padding:var(--space-sm) 0;border:0;border-bottom:1px solid var(--color-rule);background:transparent}
+body:has(.map-controls.mosaic-mode) .mosaic-area-bar>div{gap:var(--space-2xs)}
+body:has(.map-controls.mosaic-mode) .mosaic-area-bar>div>span{color:var(--color-ink);font-size:clamp(25px,2.4vw,32px);font-weight:600;line-height:1.05}
+body:has(.map-controls.mosaic-mode) .mosaic-area-bar small{color:var(--color-muted);font-size:13px;line-height:1.45}
+body:has(.map-controls.mosaic-mode) .mosaic-breadcrumb{gap:var(--space-xs);margin-bottom:0}
+body:has(.map-controls.mosaic-mode) .mosaic-breadcrumb button,body:has(.map-controls.mosaic-mode) .mosaic-breadcrumb span{min-height:28px;color:var(--color-ink-2);font-size:12px}
+body:has(.map-controls.mosaic-mode) .mosaic-area-bar .mosaic-value-summary{max-width:46%;padding:0;border:0;background:transparent;color:var(--color-muted);font-size:12px;font-weight:500;text-align:right}
+body:has(.map-controls.mosaic-mode) .map-frame{height:min(66svh,680px);min-height:480px;border:1px solid var(--color-rule);background:var(--color-paper-2)}
+body:has(.map-controls.mosaic-mode) .map-frame:before{border:0}
+body:has(.map-controls.mosaic-mode) #map{background:var(--color-paper-3)}
+body:has(.map-controls.mosaic-mode) .map-stamp{top:16px;left:62px;gap:var(--space-2xs);padding:var(--space-xs) var(--space-sm);border:1px solid var(--color-rule);background:var(--color-paper);box-shadow:none}
+body:has(.map-controls.mosaic-mode) .map-stamp span{color:var(--color-ink-2);font-size:12px;font-weight:600;letter-spacing:0;text-transform:none}
+body:has(.map-controls.mosaic-mode) .map-stamp strong{color:var(--color-ink);font-size:13px;font-weight:600}
+body:has(.map-controls.mosaic-mode) .map-footnote{gap:var(--space-md);margin:var(--space-xs) 0 var(--space-2xl);color:var(--color-muted);font-size:12px;line-height:1.5}
+body:has(.map-controls.mosaic-mode) .legend{padding:var(--space-sm) var(--space-md);border:1px solid var(--color-rule);background:var(--color-paper);color:var(--color-ink);font-size:12px;box-shadow:none}
+body:has(.map-controls.mosaic-mode) .leaflet-popup-content-wrapper,body:has(.map-controls.mosaic-mode) .leaflet-tooltip{font-family:var(--font-body)}
+body:has(.map-controls.mosaic-mode) .leaflet-control-zoom a{width:40px;height:40px;line-height:38px}
+body:has(.map-controls.mosaic-mode) .leaflet-control-attribution{font-size:12px}
+body:has(.map-controls.mosaic-mode) .mosaic-legend span{font-size:12px}
+body:has(.map-controls.mosaic-mode) .mosaic-legend small{font-size:12px}
+body:has(.map-controls.mosaic-mode) .home-choices{gap:0;margin:var(--space-lg) 0 32px;border-color:var(--color-rule)}
+body:has(.map-controls.mosaic-mode) .home-choices a{padding:var(--space-md);transition:background-color 150ms}
+body:has(.map-controls.mosaic-mode) .home-choices a:first-child{border-color:var(--color-rule)}
+body:has(.map-controls.mosaic-mode) .home-choices a:hover{background:var(--color-paper-2)}
+body:has(.map-controls.mosaic-mode) .home-choices span,body:has(.map-controls.mosaic-mode) .home-choices small{color:var(--color-muted);font-size:12px;letter-spacing:0;text-transform:none}
+body:has(.map-controls.mosaic-mode) .home-choices strong{color:var(--color-ink);font-size:27px}
+body:has(.map-controls.mosaic-mode) .map-controls.mosaic-mode :focus-visible,body:has(.map-controls.mosaic-mode) .mosaic-area-bar :focus-visible,body:has(.map-controls.mosaic-mode) .map-frame :focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}
+@media(max-width:960px){body:has(.map-controls.mosaic-mode) .mosaic-controls,body:has(.map-controls.mosaic-mode) .mosaic-controls.has-neighborhoods{grid-template-columns:repeat(2,minmax(0,1fr))}body:has(.map-controls.mosaic-mode) .mosaic-area-bar{align-items:flex-start}}
+@media(max-width:720px){body:has(.map-controls.mosaic-mode) .explore-view{padding:var(--space-md) var(--space-md) 48px}body:has(.map-controls.mosaic-mode) .site-header{padding:var(--space-xs) var(--space-md)}body:has(.map-controls.mosaic-mode) .page-heading>div:first-child{grid-template-columns:1fr;gap:var(--space-sm)}body:has(.map-controls.mosaic-mode) #viewTitle{font-size:clamp(38px,10vw,52px)}body:has(.map-controls.mosaic-mode) #viewIntro{grid-column:1;grid-row:2;max-width:58ch;padding:0;border:0;font-size:14px}body:has(.map-controls.mosaic-mode) .map-frame{height:62svh;min-height:430px;margin-inline:0;border:1px solid var(--color-rule)}body:has(.map-controls.mosaic-mode) .map-stamp{left:54px;top:14px;max-width:calc(100% - 70px)}body:has(.map-controls.mosaic-mode) .map-footnote{display:grid;gap:var(--space-2xs);margin-bottom:28px}body:has(.map-controls.mosaic-mode) .map-footnote span{display:block;margin:0}body:has(.map-controls.mosaic-mode) .mosaic-area-bar{flex-direction:column;align-items:flex-start;gap:var(--space-xs)}body:has(.map-controls.mosaic-mode) .mosaic-area-bar .mosaic-value-summary{width:100%;max-width:none;text-align:left}body:has(.map-controls.mosaic-mode) .home-choices a{padding:var(--space-sm) var(--space-xs)}}
+@media(max-width:600px){body:has(.map-controls.mosaic-mode) #viewIntro{font-size:14px;line-height:1.4}body:has(.map-controls.mosaic-mode) .map-controls.mosaic-mode{padding-block:var(--space-sm)}body:has(.map-controls.mosaic-mode) .mosaic-controls,body:has(.map-controls.mosaic-mode) .mosaic-controls.has-neighborhoods{grid-template-columns:1fr;gap:var(--space-xs)}body:has(.map-controls.mosaic-mode) .mosaic-control-field{grid-template-columns:minmax(96px,.38fr) minmax(0,1fr);align-items:center;gap:var(--space-sm)}body:has(.map-controls.mosaic-mode) .mosaic-control-field label{min-height:0;font-size:12px}body:has(.map-controls.mosaic-mode) .mosaic-control-field select{padding-inline-end:28px;font-size:14px}body:has(.map-controls.mosaic-mode) .mosaic-area-bar{gap:var(--space-2xs);padding-block:var(--space-sm)}body:has(.map-controls.mosaic-mode) .mosaic-area-bar>div>span{font-size:22px}body:has(.map-controls.mosaic-mode) .map-frame{height:60svh;min-height:420px}}
+
+/* Mercado Agora · Buscador de imóveis baratos */
+.primary-nav a[aria-current="page"]{color:var(--forest);border-color:var(--accent);font-weight:700}
+search.daily-price-tools{display:block;margin:0 0 14px;padding:18px 20px;border:1px solid var(--line);border-top:3px solid var(--forest);background:#eaf0e8}
+.daily-search-form{display:grid;gap:14px}
+.daily-price-tools-heading{display:flex;align-items:end;justify-content:space-between;flex-wrap:wrap;gap:8px 20px}
+.daily-price-tools-heading>div{display:grid;gap:3px}
+.daily-quick-chips{display:flex;flex-wrap:wrap;flex-wrap:balance;gap:8px}
+.quick-chip{min-height:38px;padding:6px 13px;border:1px solid #a8b9ad;border-radius:999px;background:#fbfcf8;color:var(--ink);font-size:12px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.quick-chip:hover{border-color:var(--forest);background:#f3f7f2}
+.quick-chip[aria-pressed="true"]{border-color:var(--forest);background:var(--forest);color:#fff}
+.daily-price-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));align-items:end;gap:10px}
+.daily-price-fields>div{display:grid;gap:5px;min-inline-size:0}
+.daily-price-fields label{color:var(--muted);font-size:11px;font-weight:700}
+.daily-price-fields select,.daily-price-fields input{width:100%;min-inline-size:0;min-height:44px;padding:8px 10px;border:1px solid var(--line);background:#fbfcf8;color:var(--ink);font-size:max(1rem,.875rem)}
+.clear-filters-btn{min-height:44px;padding:8px 14px;border:1px solid var(--forest);background:transparent;color:var(--forest);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.clear-filters-btn:hover{background:var(--forest);color:#fff}
+
+.daily-deals-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px 18px}
+.deals-count{color:var(--muted);font-size:12px;font-weight:600}
+.deals-sort-wrap{display:flex;align-items:center;gap:8px}
+.deals-sort-wrap label{color:var(--muted);font-size:11px;font-weight:700;white-space:nowrap}
+.deals-sort-wrap select{min-height:40px;padding:6px 10px;border:1px solid var(--line);background:#fbfcf8;color:var(--ink);font-size:13px}
+.daily-deals-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+.deal-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.deal-badges{display:flex;flex-wrap:wrap;gap:5px}
+.deal-badge{padding:3px 8px;font-size:10px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+.deal-badge-discount{background:#dcece2;color:var(--forest)}
+.deal-badge-drop{background:#f7e4d6;color:#984316}
+.daily-deal-price strong small{font-family:"Instrument Sans",sans-serif;font-size:13px;font-weight:600;color:var(--muted);margin-inline-start:2px}
+.deal-card-actions{display:flex;align-items:stretch;margin:auto -18px 0;border-top:1px solid var(--line)}
+.deal-card-actions>*{flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:10px 14px;font-size:12px;font-weight:700;text-decoration:none;text-align:center}
+.deal-map-btn{border:0;border-right:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+.deal-map-btn:hover{background:#e8efe7;color:var(--forest)}
+.deal-card-actions>a{color:var(--forest)}
+.deal-card-actions>a:hover{background:#dcece2}
+.deals-more-wrap{display:flex;justify-content:center;margin-top:18px}
+.deals-more-btn{min-height:44px;padding:10px 22px;border:1px solid var(--forest);background:#fbfcf8;color:var(--forest);font-size:13px;font-weight:700;cursor:pointer}
+.deals-more-btn:hover{background:var(--forest);color:#fff}
+
+.ranking-filter-btn{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:10px;width:100%;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.ranking-filter-btn:hover span:first-child{color:var(--forest);text-decoration:underline;text-decoration-color:var(--accent)}
+.ranking-filter-btn span:last-child{font-weight:700;white-space:nowrap}
+
+.aux-tools-callout{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px 24px;margin-top:44px;padding:20px 24px;border:1px solid var(--line);border-left:4px solid var(--accent);background:#f8faf4}
+.aux-tools-callout>div:first-child{display:grid;gap:4px;max-width:680px}
+.aux-tools-callout span{color:var(--forest);font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.aux-tools-callout strong{font-family:"Archivo Narrow",sans-serif;font-size:24px;font-weight:600;line-height:1.1}
+.aux-tools-callout small{color:var(--muted);font-size:12px;line-height:1.5}
+.aux-tools-links{display:flex;flex-wrap:wrap;gap:10px}
+.aux-tools-links a{display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:8px 15px;border:1px solid var(--forest);color:var(--forest);font-size:12px;font-weight:700;text-decoration:none}
+.aux-tools-links a:hover{background:var(--forest);color:#fff}
+@media(max-width:720px){
+  search.daily-price-tools{margin-inline:-18px;padding:16px 18px}
+  .daily-price-fields{grid-template-columns:1fr 1fr}
+  .daily-deals-grid{grid-template-columns:1fr}
+  .aux-tools-callout{margin-inline:-18px;padding:18px}
+}
+

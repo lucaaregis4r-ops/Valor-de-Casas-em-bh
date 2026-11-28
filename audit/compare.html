@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Moradia BH, comparação visual</title>
+  <style>
+    :root { color-scheme: light; font-family: Arial, sans-serif; background: #eef2ed; color: #173432; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 32px; }
+    main { max-width: 1680px; margin: 0 auto; }
+    h1 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 46px); }
+    p { margin: 0 0 24px; color: #52675f; }
+    .comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+    figure { min-width: 0; margin: 0; }
+    figcaption { padding: 12px 0; font-size: 15px; font-weight: 700; }
+    img { display: block; width: 100%; height: auto; border: 1px solid #b7c7bc; }
+    @media (max-width: 760px) { body { padding: 16px; } .comparison { grid-template-columns: 1fr; gap: 12px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Moradia BH</h1>
+    <p>Mesma tela e mesmo enquadramento, antes e depois do refinamento cartográfico.</p>
+    <section class="comparison" aria-label="Comparação antes e depois">
+      <figure>
+        <figcaption>Antes · interface original</figcaption>
+        <img src="before-map.png" alt="Interface original: título grande, filtros numerados em cartões e mapa metropolitano abaixo.">
+      </figure>
+      <figure>
+        <figcaption>Depois · atlas urbano</figcaption>
+        <img src="after-map.png" alt="Interface refinada: título compacto, filtros em linha e mapa metropolitano ocupando a maior parte da tela.">
+      </figure>
+    </section>
+  </main>
+</body>
+</html>

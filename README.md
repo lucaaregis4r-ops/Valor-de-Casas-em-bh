@@ -3,7 +3,7 @@
 Observatório cartográfico do mercado residencial de Belo Horizonte. O site estático apresenta ambientes separados:
 
 - **Mosaico:** mapa das 34 cidades da RMBH com escolha entre a mediana do preço por m² e a mediana do valor total; BH, Contagem, Betim e Nova Lima abrem bairros ou áreas, e as demais cidades abrem uma grade de regiões internas.
-- **Atlas:** anúncios históricos de venda de 2021 e 2026, variação da mediana do preço pedido por m², rankings, camadas de aluguel da base 2026 e comparação entre bairros.
+- **Atlas:** abre nos anúncios ativos de aluguel e compara tendências recentes e preços por bairro com a média das coletas anteriores; mantém como referência as vendas de 2021 e 2026, a variação histórica e as camadas de aluguel da base 2026.
 - **Mercado Agora:** anúncios ativos de aluguel, eventos e agregados das coletas recentes, com data e comparação opcional entre coletas. Na oferta ativa mais recente, o mapa pode colorir os anúncios pelo total mensal anunciado (aluguel + condomínio + IPTU), pelo aluguel pedido ou pelo aluguel/m²; uma faixa mínima e máxima mostra os anúncios correspondentes no mapa. Três anúncios abaixo das medianas do bairro e da cidade, comparados pelo custo total por m² entre imóveis do mesmo tipo, têm links diretos para as ofertas.
 - **Bairros:** índice e perfis que mostram o histórico de venda e a oferta atual de aluguel em blocos distintos.
 - **Metodologia:** fontes, períodos e limites de interpretação.

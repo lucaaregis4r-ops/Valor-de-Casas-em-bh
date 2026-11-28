@@ -42,7 +42,9 @@ if [[ "$ready" != 1 ]]; then
   exit 3
 fi
 
-git pull --ff-only origin main
+# Rebase the local data-only commits when the remote advances independently.
+# Autostash lets scheduled runs use a checkout with local UI edits in progress.
+git pull --rebase --autostash origin main
 "$PYTHON" -m pipeline.init_db
 
 collect_status=0
@@ -84,6 +86,9 @@ git add data/public/current.json data/public/neighborhood_daily.json \
 if ! git diff --cached --quiet; then
   git commit -m "Atualiza dados públicos do observatório"
 fi
-git push origin HEAD:main
+if ! git push origin HEAD:main; then
+  echo "Dados gerados localmente, mas não publicados. Verifique a autenticação GitHub deste usuário e execute a coleta novamente." >&2
+  exit 5
+fi
 
 exit "$collect_status"
